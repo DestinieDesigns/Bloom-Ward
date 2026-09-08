@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>BloomWord - Fun Vocabulary & Faith Garden</title>
+    <script>
+      // Single Page Application redirect for GitHub Pages
+      var currentPath = window.location.pathname;
+      if (currentPath.includes('/Bloom-Ward')) {
+        // If not already in docs, go to /Bloom-Ward/docs/
+        if (!currentPath.includes('/docs')) {
+          window.location.replace('/Bloom-Ward/docs/');
+        } else {
+          window.location.replace('/Bloom-Ward/docs/');
+        }
+      } else {
+        window.location.replace('/');
+      }
+    </script>
+  </head>
+  <body style="font-family: sans-serif; text-align: center; padding: 48px; background-color: #FFF5F8; color: #db2777;">
+    <h2>🌸 BloomWord</h2>
+    <p>Redirecting to BloomWord... If you are not redirected automatically, <a href="./docs/">click here</a>.</p>
+  </body>
+</html>
