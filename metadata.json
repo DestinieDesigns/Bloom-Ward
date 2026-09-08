@@ -1,0 +1,6 @@
+{
+  "name": "BloomWord - Fun Vocabulary & Faith Garden",
+  "description": "An encouraging, magical vocabulary, spelling, reading comprehension, and Bible learning adventure with a bloom garden, Duolingo-style milestones, and adaptive practice.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
