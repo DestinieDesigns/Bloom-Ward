@@ -41,6 +41,20 @@ export interface VocabWord {
   dateDiscovered?: string;
   isHomework?: boolean;
   homeworkTag?: string;
+  // Enhanced Daily Learning, Flashcard & Spelling Tracking
+  syllables?: string;
+  memoryTip?: string;
+  spellingBreakdown?: string;
+  confidenceRating?: 'learning' | 'getting_it' | 'known';
+  spellingAttempts?: number;
+  spellingCorrectAttempts?: number;
+  spellingTrueTestCorrect?: number;
+  spellingTrueTestAttempts?: number;
+  spellingMasteryStage?: 'introduced' | 'studying' | 'practicing' | 'testing' | 'growing' | 'mastered';
+  lastSpellingTestDate?: string;
+  needsReview?: boolean;
+  flashcardReviewCount?: number;
+  lastFlashcardDate?: string;
 }
 
 export interface ReadingSession {
@@ -164,6 +178,89 @@ export interface WeeklyAssessmentResult {
   wordsTested: string[];
 }
 
+export interface DailyGoalConfig {
+  readingMinutes: number; // 15, 30, 60
+  vocabularyWords: number; // 3, 5, 10
+  flashcardsCount: number; // 5, 10, 20
+  spellingWords: number; // 3, 5, 10
+}
+
+export interface DailyLearningLog {
+  date: string; // YYYY-MM-DD
+  readingMinutes: number;
+  wordsLearnedCount: number;
+  flashcardsReviewedCount: number;
+  spellingWordsTestedCount: number;
+  faithWordCompleted: boolean;
+  goalsCompletedCount: number;
+  totalGoalsCount: number;
+  streakProtected: boolean;
+  xpEarned: number;
+}
+
+export interface TodayActivityProgress {
+  date: string;
+  readingMinutes: number;
+  wordsLearned: number;
+  flashcardsReviewed: number;
+  spellingCompleted: number;
+  faithWordDone: boolean;
+  wordReviewDone: boolean;
+}
+
+export type StartingPathId =
+  | 'word_explorer'
+  | 'word_builder'
+  | 'word_adventurer'
+  | 'word_scholar'
+  | 'word_master';
+
+export type SkillProficiency = 'needs_practice' | 'growing' | 'strong';
+
+export interface CategoryResult {
+  category: 'vocabulary' | 'definitions' | 'spelling' | 'reading' | 'recognition';
+  title: string;
+  score: number;
+  total: number;
+  proficiency: SkillProficiency; // 'needs_practice' | 'growing' | 'strong'
+  strengths: string[];
+  growthAreas: string[];
+}
+
+export interface StartingAssessmentResult {
+  completedAt: string;
+  startingPath: StartingPathId;
+  pathTitle: string;
+  pathDescription: string;
+  icon: string;
+  overallScorePercent: number;
+  skills: {
+    vocabulary: CategoryResult;
+    definitions: CategoryResult;
+    spelling: CategoryResult;
+    reading: CategoryResult;
+    recognition: CategoryResult;
+  };
+  recommendedGoals: DailyGoalConfig;
+  personalizedStrengths: string[];
+  personalizedGrowthAreas: string[];
+  isGrowthCheckpoint?: boolean;
+  baselineComparison?: {
+    vocabularyGrowth: string;
+    spellingGrowth: string;
+    readingGrowth: string;
+    overallGrowthNote: string;
+  };
+}
+
+export interface AssessmentSaveState {
+  currentCategoryIndex: number;
+  currentQuestionIndex: number;
+  answers: Record<string, string>;
+  categoryStats: Record<string, { correct: number; total: number }>;
+  lastUpdated: string;
+}
+
 export interface UserProfile {
   id?: string;
   accountId?: string;
@@ -172,6 +269,7 @@ export interface UserProfile {
   level: number;
   xp: number;
   streak: number;
+  longestStreak?: number;
   lastActiveDate: string;
   weeklyGoalCompleted: number;
   weeklyGoalTotal: number;
@@ -193,14 +291,26 @@ export interface UserProfile {
   startingLevelAssessed?: LearningLevel;
   isParentProtected?: boolean;
   parentPin?: string;
+  // Daily Learning Tracker System
+  dailyGoals?: DailyGoalConfig;
+  todayActivity?: TodayActivityProgress;
+  learningHistory?: DailyLearningLog[];
+  // Starting Assessment & Personalized Learning Placement
+  startingAssessment?: StartingAssessmentResult;
+  startingAssessmentHistory?: StartingAssessmentResult[];
+  assessmentSaveState?: AssessmentSaveState | null;
 }
 
 export type AppSection =
   | 'home'
+  | 'starting_assessment'
+  | 'daily_tracker'
+  | 'flashcards'
+  | 'spelling_adventure'
+  | 'spelling_test'
   | 'reading_adventure'
   | 'daily_adventure'
   | 'learning_path'
-  | 'spelling_adventure'
   | 'reading_room'
   | 'faith_garden'
   | 'review_garden'

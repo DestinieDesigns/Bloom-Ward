@@ -59,6 +59,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems: { id: AppSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <span>{theme.icon}</span> },
     {
+      id: 'starting_assessment',
+      label: profile.startingAssessment ? 'Learning Path' : 'Discover Path',
+      icon: <span>🌱</span>,
+      badge: profile.startingAssessment ? undefined : '✨ New'
+    },
+    { id: 'flashcards', label: 'Flashcards', icon: <span>🎴</span> },
+    { id: 'spelling_test', label: 'Spelling Test', icon: <span>📝</span> },
+    {
       id: 'reading_adventure',
       label: 'Reading Adventure',
       icon: <BookOpen className="w-4 h-4 text-pink-500" />,
@@ -66,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     { id: 'daily_adventure', label: 'Daily Lesson', icon: <span>⭐</span> },
     { id: 'learning_path', label: 'Adventure Path', icon: <Compass className="w-4 h-4 text-indigo-500" /> },
-    { id: 'spelling_adventure', label: 'Spelling', icon: <span>✏️</span> },
+    { id: 'spelling_adventure', label: 'Spelling Practice', icon: <span>✏️</span> },
     { id: 'reading_room', label: 'Story Room', icon: <BookOpen className="w-4 h-4 text-purple-500" /> },
     { id: 'faith_garden', label: 'Faith Words', icon: <span>✝️</span> },
     {

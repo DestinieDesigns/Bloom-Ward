@@ -22,6 +22,7 @@ interface OnboardingModalProps {
   onSaveProfile: (updated: Partial<UserProfile>) => void;
   onClose: () => void;
   isInitialOnboarding?: boolean;
+  onStartAssessment?: () => void;
 }
 
 const AVATAR_OPTIONS = ['🌸', '🚀', '🦊', '👑', '🐬', '🎮', '🌿', '⭐', '🦄', '📚', '🦁', '🧑‍🚀'];
@@ -43,7 +44,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   profile,
   onSaveProfile,
   onClose,
-  isInitialOnboarding = false
+  isInitialOnboarding = false,
+  onStartAssessment
 }) => {
   const [step, setStep] = useState<number>(1);
   const [name, setName] = useState<string>(profile.name);
@@ -64,7 +66,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = (startAssessmentNow: boolean = false) => {
     sound.playSuccessChime();
     triggerCelebrationConfetti();
     onSaveProfile({
@@ -77,6 +79,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       onboardingCompleted: true
     });
     onClose();
+    if (startAssessmentNow && onStartAssessment) {
+      onStartAssessment();
+    }
   };
 
   const activeThemeConfig = getThemeConfig(selectedTheme);
@@ -107,6 +112,55 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             </button>
           )}
         </div>
+
+        {/* Quick Tabs in Settings Mode */}
+        {!isInitialOnboarding && (
+          <div className="flex border-b border-slate-100 gap-1.5 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                sound.playPop();
+                setStep(1);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                step === 1
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Profile & Level
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sound.playPop();
+                setStep(2);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                step === 2
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Visual Theme
+            </button>
+            <button
+              type="button"
+              id="settings-reading-time-tab-btn"
+              onClick={() => {
+                sound.playPop();
+                setStep(3);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                step === 3
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <span>⏱️ Reading Time & Goals</span>
+            </button>
+          </div>
+        )}
 
         {/* STEP 1: Name & Avatar */}
         {step === 1 && (
@@ -271,28 +325,50 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         {/* STEP 3: Goals & Interests */}
         {step === 3 && (
           <div className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                ⏱️ Daily Real-Book Reading Goal
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[15, 20, 30].map((mins) => (
-                  <button
-                    key={mins}
-                    onClick={() => {
-                      sound.playPop();
-                      setDailyReadingGoal(mins);
-                    }}
-                    className={`py-3 rounded-2xl border-2 font-bold text-xs sm:text-sm text-center transition-all cursor-pointer ${
-                      dailyReadingGoal === mins
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-extrabold shadow-xs'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <div>{mins} min/day</div>
-                    {mins === 15 && <div className="text-[10px] text-indigo-600 font-normal">★ Recommended</div>}
-                  </button>
-                ))}
+            {/* Reading Time Toggle */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  ⏱️ Daily Reading Time Goal
+                </label>
+                <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                  {dailyReadingGoal} mins / day
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Customize the daily real-book focus reading timer goal for your child.
+              </p>
+              <div
+                role="radiogroup"
+                aria-label="Daily Reading Time Goal"
+                className="grid grid-cols-3 gap-2"
+              >
+                {[15, 30, 60].map((mins) => {
+                  const isSelected = dailyReadingGoal === mins;
+                  return (
+                    <button
+                      key={mins}
+                      id={`settings-reading-time-${mins}-btn`}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => {
+                        sound.playPop();
+                        setDailyReadingGoal(mins);
+                      }}
+                      className={`py-3 px-2 rounded-2xl border-2 font-bold text-xs sm:text-sm text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-800 font-extrabold shadow-sm ring-2 ring-indigo-200'
+                          : 'border-slate-200 hover:bg-white text-slate-700'
+                      }`}
+                    >
+                      <div className="font-['Fredoka'] text-sm sm:text-base">{mins} Mins</div>
+                      {mins === 15 && <div className="text-[10px] text-indigo-600 font-semibold">★ Recommended</div>}
+                      {mins === 30 && <div className="text-[10px] text-slate-500 font-medium">Book Worm</div>}
+                      {mins === 60 && <div className="text-[10px] text-amber-600 font-medium">Champion 🏆</div>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -320,21 +396,43 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
               <button
                 onClick={() => setStep(2)}
-                className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer order-last sm:order-first"
               >
                 Back
               </button>
-              <button
-                id="finish-profile-setup-btn"
-                onClick={handleFinish}
-                className="px-8 py-3 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-sm flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-200"
-              >
-                <span>Save & Start Learning</span>
-                <Check className="w-4 h-4 stroke-[3]" />
-              </button>
+
+              <div className="flex flex-wrap items-center gap-2 justify-end w-full sm:w-auto">
+                {isInitialOnboarding && onStartAssessment ? (
+                  <>
+                    <button
+                      onClick={() => handleFinish(false)}
+                      className="px-4 py-2.5 rounded-full text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    >
+                      Go to Dashboard
+                    </button>
+                    <button
+                      id="finish-and-discover-path-btn"
+                      onClick={() => handleFinish(true)}
+                      className="px-6 py-3 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-sm flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-200 font-['Fredoka']"
+                    >
+                      <span>🌱 Save & Discover Learning Path</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    id="finish-profile-setup-btn"
+                    onClick={() => handleFinish(false)}
+                    className="px-8 py-3 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-sm flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-200"
+                  >
+                    <span>Save & Start Learning</span>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

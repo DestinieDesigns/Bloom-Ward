@@ -243,8 +243,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { minutes: 15, label: '15 Mins ⭐', desc: 'Recommended' },
-                    { minutes: 20, label: '20 Mins', desc: 'Steady Reader' },
-                    { minutes: 30, label: '30 Mins', desc: 'Book Worm' }
+                    { minutes: 30, label: '30 Mins', desc: 'Book Worm' },
+                    { minutes: 60, label: '60 Mins', desc: 'Champion 🏆' }
                   ].map((g) => (
                     <button
                       type="button"

@@ -105,6 +105,14 @@ export const ReadingAdventure: React.FC<ReadingAdventureProps> = ({
   // Interval Ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Sync with profile daily goal if updated in settings/dashboard
+  useEffect(() => {
+    if (stage === 'setup' && profile.dailyReadingGoalMinutes) {
+      setSelectedMinutes(profile.dailyReadingGoalMinutes);
+      setSecondsRemaining(profile.dailyReadingGoalMinutes * 60);
+    }
+  }, [profile.dailyReadingGoalMinutes, stage]);
+
   // Handle countdown interval
   useEffect(() => {
     if (stage === 'reading' && isActive) {
@@ -375,7 +383,7 @@ export const ReadingAdventure: React.FC<ReadingAdventureProps> = ({
                     }`}
                   >
                     <span className="text-base font-['Fredoka']">{mins} min</span>
-                    {mins === 15 && (
+                    {mins === (profile.dailyReadingGoalMinutes || 15) && (
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/30 text-white' : 'bg-pink-100 text-pink-700 font-bold'}`}>
                         ★ Goal
                       </span>

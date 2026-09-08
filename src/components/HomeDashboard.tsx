@@ -23,11 +23,13 @@ import {
   BibleWord,
   GardenPlot,
   AchievementBadge,
-  AppSection
+  AppSection,
+  DailyGoalConfig
 } from '../types';
 import { getThemeConfig } from '../data/themes';
 import { sound } from '../utils/audio';
 import { triggerCelebrationConfetti, triggerSparkleConfetti } from '../utils/storage';
+import { DailyTracker } from './DailyTracker';
 
 interface HomeDashboardProps {
   profile: UserProfile;
@@ -40,6 +42,7 @@ interface HomeDashboardProps {
   onWaterPlot: (plotId: string) => void;
   onOpenThemes?: () => void;
   onOpenHomework?: () => void;
+  onUpdateGoals?: (newGoals: DailyGoalConfig) => void;
 }
 
 export const HomeDashboard: React.FC<HomeDashboardProps> = ({
@@ -52,7 +55,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onAddXp,
   onWaterPlot,
   onOpenThemes,
-  onOpenHomework
+  onOpenHomework,
+  onUpdateGoals
 }) => {
   const theme = getThemeConfig(profile.theme);
 
@@ -110,6 +114,17 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             </button>
 
             <button
+              id="hero-learning-path-btn"
+              onClick={() => {
+                sound.playPop();
+                onSelectSection('starting_assessment');
+              }}
+              className="px-6 py-3.5 rounded-full bg-white/25 hover:bg-white/35 text-white font-extrabold text-sm sm:text-base backdrop-blur-xs border border-white/40 cursor-pointer flex items-center gap-2 transition-all hover:scale-105 font-['Fredoka']"
+            >
+              <span>{profile.startingAssessment ? '🌱 Active Learning Path' : '✨ Discover My Path'}</span>
+            </button>
+
+            <button
               id="hero-reading-adventure-btn"
               onClick={() => {
                 sound.playPop();
@@ -118,7 +133,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               className="px-6 py-3.5 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-sm sm:text-base backdrop-blur-xs border border-white/40 cursor-pointer flex items-center gap-2 transition-all hover:scale-105"
             >
               <BookOpen className="w-5 h-5" />
-              <span>📚 15-Min Reading Adventure</span>
+              <span>📚 Reading Adventure</span>
             </button>
 
             {onOpenThemes && (
@@ -137,6 +152,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 🌟 MY DAILY LEARNING JOURNEY (Prominent Daily Tracker) */}
+      <DailyTracker
+        profile={profile}
+        vocabWords={vocabWords}
+        onSelectSection={onSelectSection}
+        onUpdateGoals={onUpdateGoals || (() => {})}
+      />
 
       {/* DUAL FEATURE HIGHLIGHT: MY READING ADVENTURE & HOMEWORK WORDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

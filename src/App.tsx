@@ -12,7 +12,9 @@ import {
   ReadingSession,
   BookRecord,
   ThemeId,
-  LearningLevel
+  LearningLevel,
+  DailyGoalConfig,
+  TodayActivityProgress
 } from './types';
 import {
   loadProfile,
@@ -41,6 +43,7 @@ import {
 import { getAdaptiveDailyWords } from './utils/adaptive';
 import { sound } from './utils/audio';
 import { getThemeConfig } from './data/themes';
+import { getTodayActivity } from './utils/dailyLearningHelper';
 import { Navbar } from './components/Navbar';
 import { HomeDashboard } from './components/HomeDashboard';
 import { DailyAdventure } from './components/DailyAdventure';
@@ -57,6 +60,11 @@ import { ReadingAdventure } from './components/ReadingAdventure';
 import { ThemeSelectorModal } from './components/ThemeSelectorModal';
 import { HomeworkWordsModal } from './components/HomeworkWordsModal';
 import { OnboardingModal } from './components/OnboardingModal';
+import { DailyTracker } from './components/DailyTracker';
+import { FlashcardCenter } from './components/FlashcardCenter';
+import { TrueSpellingTest } from './components/TrueSpellingTest';
+import { DiscoverLearningPath } from './components/DiscoverLearningPath';
+import { StartingAssessmentResult } from './types';
 
 // Firebase & Cloud Accounts Integration
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -256,6 +264,15 @@ function MainAppContent() {
 
   // Word Progress Handler (Spaced repetition engine)
   const handleUpdateWordScore = (targetWord: VocabWord, isCorrect: boolean) => {
+    // Update daily activity words count
+    const currentActivity = getTodayActivity(activeProfile);
+    updateActiveProfile({
+      todayActivity: {
+        ...currentActivity,
+        wordsLearned: currentActivity.wordsLearned + 1
+      }
+    });
+
     setWords((prev) =>
       prev.map((w) => {
         if (w.id !== targetWord.id) return w;
@@ -286,6 +303,85 @@ function MainAppContent() {
           masteryLevel: newMastery,
           mastered: isMastered,
           lastPracticedDate: new Date().toISOString().split('T')[0]
+        };
+      })
+    );
+  };
+
+  // Daily Goals customization handler
+  const handleUpdateDailyGoals = (newGoals: DailyGoalConfig) => {
+    updateActiveProfile({
+      dailyGoals: newGoals,
+      dailyReadingGoalMinutes: newGoals.readingMinutes
+    });
+  };
+
+  // Flashcards reviewed handler
+  const handleFlashcardReviewed = (count: number = 1) => {
+    const currentActivity = getTodayActivity(activeProfile);
+    updateActiveProfile({
+      todayActivity: {
+        ...currentActivity,
+        flashcardsReviewed: currentActivity.flashcardsReviewed + count
+      }
+    });
+  };
+
+  // Spelling test completed count handler
+  const handleSpellingCompleted = (count: number = 1) => {
+    const currentActivity = getTodayActivity(activeProfile);
+    updateActiveProfile({
+      todayActivity: {
+        ...currentActivity,
+        spellingCompleted: currentActivity.spellingCompleted + count
+      }
+    });
+  };
+
+  // True Spelling Test performance handler (learning vs testing separation)
+  const handleUpdateSpellingScore = (
+    targetWord: VocabWord,
+    isCorrect: boolean,
+    isIndependentTest: boolean
+  ) => {
+    setWords((prev) =>
+      prev.map((w) => {
+        if (w.id !== targetWord.id) return w;
+
+        const newSpellingAttempts = (w.spellingAttempts || 0) + 1;
+        const newSpellingCorrect = isCorrect
+          ? (w.spellingCorrectAttempts || 0) + 1
+          : (w.spellingCorrectAttempts || 0);
+
+        let newTestAttempts = w.spellingTrueTestAttempts || 0;
+        let newTestCorrect = w.spellingTrueTestCorrect || 0;
+        let newMasteryStage = w.spellingMasteryStage || 'introduced';
+
+        if (isIndependentTest) {
+          newTestAttempts += 1;
+          if (isCorrect) {
+            newTestCorrect += 1;
+            if (newTestCorrect >= 3) {
+              newMasteryStage = 'mastered';
+            } else if (newTestCorrect >= 2) {
+              newMasteryStage = 'growing';
+            } else {
+              newMasteryStage = 'testing';
+            }
+          } else {
+            newMasteryStage = 'studying';
+          }
+        }
+
+        return {
+          ...w,
+          spellingAttempts: newSpellingAttempts,
+          spellingCorrectAttempts: newSpellingCorrect,
+          spellingTrueTestAttempts: newTestAttempts,
+          spellingTrueTestCorrect: newTestCorrect,
+          spellingMasteryStage: newMasteryStage,
+          needsReview: !isCorrect,
+          lastSpellingTestDate: new Date().toISOString().split('T')[0]
         };
       })
     );
@@ -344,12 +440,19 @@ function MainAppContent() {
     const isNewDay = activeProfile.lastReadingDate !== todayStr;
     const newStreak = isNewDay ? activeProfile.readingStreak + 1 : activeProfile.readingStreak;
 
+    const currentActivity = getTodayActivity(activeProfile);
+    const updatedActivity = {
+      ...currentActivity,
+      readingMinutes: currentActivity.readingMinutes + session.minutesRead
+    };
+
     updateActiveProfile({
       totalReadingMinutes: activeProfile.totalReadingMinutes + session.minutesRead,
       totalReadingSessions: activeProfile.totalReadingSessions + 1,
       readingStreak: newStreak,
       longestReadingStreak: Math.max(activeProfile.longestReadingStreak, newStreak),
-      lastReadingDate: todayStr
+      lastReadingDate: todayStr,
+      todayActivity: updatedActivity
     });
   };
 
@@ -439,6 +542,25 @@ function MainAppContent() {
     triggerCelebrationConfetti();
   };
 
+  // Starting Assessment & Personalized Learning Placement
+  const handleSaveStartingAssessment = (result: StartingAssessmentResult) => {
+    const previousHistory = activeProfile.startingAssessmentHistory || [];
+    const updatedHistory = activeProfile.startingAssessment
+      ? [activeProfile.startingAssessment, ...previousHistory]
+      : previousHistory;
+
+    updateActiveProfile({
+      initialAssessmentCompleted: true,
+      startingAssessment: result,
+      startingAssessmentHistory: updatedHistory,
+      assessmentSaveState: undefined,
+      dailyGoals: result.recommendedGoals,
+      dailyReadingGoalMinutes: result.recommendedGoals.readingMinutes
+    });
+    sound.playLevelUpFanfare();
+    triggerCelebrationConfetti();
+  };
+
   return (
     <div
       className={`min-h-screen ${currentTheme.bgGradient} text-slate-800 font-['Quicksand'] selection:bg-pink-200 selection:text-pink-900 pb-16 transition-colors duration-500`}
@@ -522,6 +644,52 @@ function MainAppContent() {
                 onAddXp={handleAddXp}
                 onOpenThemes={() => setShowThemeModal(true)}
                 onOpenHomework={() => setShowHomeworkModal(true)}
+                onUpdateGoals={handleUpdateDailyGoals}
+              />
+            )}
+
+            {activeSection === 'starting_assessment' && (
+              <div className="max-w-5xl mx-auto px-4 py-6">
+                <DiscoverLearningPath
+                  profile={activeProfile}
+                  onSaveAssessment={handleSaveStartingAssessment}
+                  onUpdateGoals={handleUpdateDailyGoals}
+                  onSelectSection={handleNavigateSection}
+                  onClose={() => setActiveSection('home')}
+                />
+              </div>
+            )}
+
+            {activeSection === 'daily_tracker' && (
+              <div className="max-w-5xl mx-auto px-4 py-6">
+                <DailyTracker
+                  profile={activeProfile}
+                  vocabWords={words}
+                  onSelectSection={handleNavigateSection}
+                  onUpdateGoals={handleUpdateDailyGoals}
+                />
+              </div>
+            )}
+
+            {activeSection === 'flashcards' && (
+              <FlashcardCenter
+                words={words}
+                profile={activeProfile}
+                onUpdateWordScore={handleUpdateWordScore}
+                onAddXp={handleAddXp}
+                onFlashcardReviewed={handleFlashcardReviewed}
+                onBackToHome={() => setActiveSection('home')}
+              />
+            )}
+
+            {activeSection === 'spelling_test' && (
+              <TrueSpellingTest
+                words={words}
+                profile={activeProfile}
+                onUpdateSpellingScore={handleUpdateSpellingScore}
+                onAddXp={handleAddXp}
+                onSpellingCompleted={handleSpellingCompleted}
+                onBackToHome={() => setActiveSection('home')}
               />
             )}
 
@@ -627,6 +795,7 @@ function MainAppContent() {
                 onUpdateProfile={updateActiveProfile}
                 onOpenAuth={() => setShowAuthModal(true)}
                 onSignOut={signOutUser}
+                onSelectSection={handleNavigateSection}
                 userEmail={user ? user.email : null}
                 syncStatus={syncStatus}
               />
@@ -705,6 +874,7 @@ function MainAppContent() {
           onSaveProfile={(updated) => updateActiveProfile(updated)}
           onClose={() => setShowProfileModal(false)}
           isInitialOnboarding={false}
+          onStartAssessment={() => setActiveSection('starting_assessment')}
         />
       )}
     </div>
