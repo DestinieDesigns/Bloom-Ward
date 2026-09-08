@@ -325,6 +325,36 @@ export const DailyTracker: React.FC<DailyTrackerProps> = ({
           </div>
         </div>
 
+        {/* 🎁 COMPLETE TODAY'S JOURNEY REWARD PREVIEW */}
+        <div className="mt-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 border-2 border-pink-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <span className="text-3xl sm:text-4xl p-2 rounded-2xl bg-white shadow-xs border border-pink-100">
+              🌸
+            </span>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-pink-700 block">
+                🎁 Complete Today's Learning Journey
+              </span>
+              <h5 className="text-sm sm:text-base font-extrabold text-slate-800 font-['Fredoka']">
+                Reward: <span className="text-pink-600">Mystery Room Decor & Sticker for My Home</span>
+              </h5>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Finish today's reading and vocabulary to decorate your rooms and grow your Knowledge Garden!
+              </p>
+            </div>
+          </div>
+          <button
+            id="tracker-visit-learning-home-btn"
+            onClick={() => {
+              sound.playPop();
+              onSelectSection('learning_home');
+            }}
+            className="px-5 py-2.5 rounded-full bg-pink-500 hover:bg-pink-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
+          >
+            <span>Visit My Home 🏡</span>
+          </button>
+        </div>
+
         {/* WEEKLY ACTIVITY CALENDAR STREAK ROW */}
         <div className="mt-6 pt-5 border-t border-slate-100">
           <div className="flex items-center justify-between mb-3">

@@ -299,10 +299,135 @@ export interface UserProfile {
   startingAssessment?: StartingAssessmentResult;
   startingAssessmentHistory?: StartingAssessmentResult[];
   assessmentSaveState?: AssessmentSaveState | null;
+  // Learning Home & Decorating Reward System
+  learningHomeState?: UserLearningHomeState;
+}
+
+export type HomeRoomId =
+  | 'main_room'
+  | 'reading_room'
+  | 'creative_room'
+  | 'knowledge_garden'
+  | 'dream_room'
+  | 'grand_library';
+
+export type ItemCategory =
+  | 'furniture'
+  | 'decoration'
+  | 'sticker'
+  | 'companion'
+  | 'special';
+
+export type HomeStyleTheme =
+  | 'pink_garden'
+  | 'ocean_adventure'
+  | 'space_explorer'
+  | 'animal_world'
+  | 'fantasy_world'
+  | 'cozy_modern';
+
+export interface PlacedHomeItem {
+  instanceId: string;
+  itemId: string;
+  x: number; // percentage (0 to 100)
+  y: number; // percentage (0 to 100)
+  scale: number; // 0.7 to 1.8
+  rotation: number; // 0, 90, 180, 270 degrees
+  zIndex: number;
+}
+
+export interface HomeItem {
+  id: string;
+  name: string;
+  category: ItemCategory;
+  icon: string; // emoji representation
+  visualStyle?: HomeStyleTheme | 'general';
+  description: string;
+  unlocked: boolean;
+  unlockCondition: string;
+  unlockSource: 'starter' | 'reading' | 'vocabulary' | 'spelling' | 'flashcards' | 'streak' | 'word_mastery' | 'milestone';
+  associatedWord?: string;
+  defaultScale?: number;
+  isResizable?: boolean;
+  isRotatable?: boolean;
+  interactiveType?: 'reading_corner' | 'knowledge_desk' | 'spelling_station' | 'faith_corner' | 'companion_pet' | 'knowledge_flower';
+  interactiveData?: {
+    title?: string;
+    description?: string;
+    targetSection?: AppSection;
+    petName?: string;
+    petDialogue?: string;
+    word?: string;
+    definition?: string;
+  };
+}
+
+export interface HomeRoom {
+  id: HomeRoomId;
+  name: string;
+  subtitle: string;
+  icon: string;
+  unlocked: boolean;
+  unlockRequirement: string;
+  unlockRequirementMet: boolean;
+  currentProgress?: number;
+  maxProgress?: number;
+  styleTheme: HomeStyleTheme;
+  wallpaperClass: string;
+  flooringClass: string;
+  placedItems: PlacedHomeItem[];
+}
+
+export type StickerCategory =
+  | 'learning'
+  | 'reading'
+  | 'spelling'
+  | 'faith'
+  | 'special_event';
+
+export interface StickerItem {
+  id: string;
+  name: string;
+  icon: string;
+  category: StickerCategory;
+  description: string;
+  unlockCondition: string;
+  unlocked: boolean;
+  unlockedDate?: string;
+  associatedWord?: string;
+  rarity?: 'common' | 'rare' | 'sparkling' | 'legendary';
+}
+
+export interface KnowledgeGardenWordPlant {
+  wordId: string;
+  word: string;
+  definition: string;
+  syllables?: string;
+  partOfSpeech?: string;
+  exampleSentence?: string;
+  stage: 'seed' | 'sprout' | 'blossom' | 'permanent_flower';
+  flowerEmoji: string;
+  flowerColor: string;
+  masteryDate?: string;
+  timesPracticed: number;
+}
+
+export interface UserLearningHomeState {
+  activeRoomId: HomeRoomId;
+  rooms: Record<HomeRoomId, HomeRoom>;
+  unlockedItemIds: string[];
+  collectedStickerIds: string[];
+  lastEarnedGift?: {
+    item: HomeItem;
+    reason: string;
+    date: string;
+  };
 }
 
 export type AppSection =
   | 'home'
+  | 'learning_home'
+  | 'sticker_book'
   | 'starting_assessment'
   | 'daily_tracker'
   | 'flashcards'

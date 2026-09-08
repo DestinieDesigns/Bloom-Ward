@@ -59,6 +59,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems: { id: AppSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <span>{theme.icon}</span> },
     {
+      id: 'learning_home',
+      label: 'My Learning Home',
+      icon: <span>🏡</span>,
+      badge: '✨ Rewards'
+    },
+    {
       id: 'starting_assessment',
       label: profile.startingAssessment ? 'Learning Path' : 'Discover Path',
       icon: <span>🌱</span>,

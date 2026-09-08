@@ -64,6 +64,7 @@ import { DailyTracker } from './components/DailyTracker';
 import { FlashcardCenter } from './components/FlashcardCenter';
 import { TrueSpellingTest } from './components/TrueSpellingTest';
 import { DiscoverLearningPath } from './components/DiscoverLearningPath';
+import { LearningHome } from './components/LearningHome';
 import { StartingAssessmentResult } from './types';
 
 // Firebase & Cloud Accounts Integration
@@ -669,6 +670,16 @@ function MainAppContent() {
                   onUpdateGoals={handleUpdateDailyGoals}
                 />
               </div>
+            )}
+
+            {activeSection === 'learning_home' && (
+              <LearningHome
+                profile={activeProfile}
+                words={words}
+                readingSessions={readingSessions}
+                onSelectSection={handleNavigateSection}
+                onUpdateProfile={updateActiveProfile}
+              />
             )}
 
             {activeSection === 'flashcards' && (
