@@ -398,6 +398,16 @@ export interface StickerItem {
   rarity?: 'common' | 'rare' | 'sparkling' | 'legendary';
 }
 
+export type FlowerSpecies =
+  | 'rose'
+  | 'sunflower'
+  | 'lotus'
+  | 'tulip'
+  | 'daisy'
+  | 'orchid'
+  | 'lavender'
+  | 'wildflower';
+
 export interface KnowledgeGardenWordPlant {
   wordId: string;
   word: string;
@@ -408,6 +418,12 @@ export interface KnowledgeGardenWordPlant {
   stage: 'seed' | 'sprout' | 'blossom' | 'permanent_flower';
   flowerEmoji: string;
   flowerColor: string;
+  flowerSpecies?: FlowerSpecies;
+  growthPercent?: number;
+  masteryTitle?: string;
+  category?: string;
+  masteryLevel?: MasteryLevel;
+  confidenceRating?: 'learning' | 'getting_it' | 'known';
   masteryDate?: string;
   timesPracticed: number;
 }

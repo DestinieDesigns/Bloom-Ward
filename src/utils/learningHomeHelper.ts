@@ -3,6 +3,7 @@ import {
   HomeRoom,
   HomeRoomId,
   KnowledgeGardenWordPlant,
+  FlowerSpecies,
   StickerItem,
   UserLearningHomeState,
   UserProfile,
@@ -469,21 +470,69 @@ export const getKnowledgeGardenPlants = (words: VocabWord[]): KnowledgeGardenWor
   const FLOWER_EMOJIS = ['🌸', '🌺', '🌻', '🌷', '🪷', '🌼', '🌹', '💐'];
   const FLOWER_COLORS = ['#ec4899', '#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#06b6d4'];
 
+  const getSpeciesForWord = (word: VocabWord, index: number): FlowerSpecies => {
+    const cat = (word.category || '').toLowerCase();
+    const w = word.word.toLowerCase();
+
+    if (cat.includes('faith') || cat.includes('virtue') || w === 'shalom' || w === 'grace' || w === 'peace') {
+      return 'lotus';
+    }
+    if (cat.includes('nature') || cat.includes('science') || cat.includes('animal')) {
+      return index % 2 === 0 ? 'sunflower' : 'wildflower';
+    }
+    if (cat.includes('emotion') || cat.includes('character') || w === 'kindness' || w === 'courage') {
+      return 'rose';
+    }
+    if (cat.includes('adventure') || cat.includes('action')) {
+      return 'tulip';
+    }
+    if (cat.includes('everyday') || cat.includes('foundation') || cat.includes('school')) {
+      return 'daisy';
+    }
+    if (word.difficulty === 'challenging' || w === 'magnificent' || w === 'persevere') {
+      return 'orchid';
+    }
+
+    const speciesList: FlowerSpecies[] = ['rose', 'sunflower', 'lotus', 'tulip', 'daisy', 'orchid', 'lavender', 'wildflower'];
+    return speciesList[Math.abs(w.charCodeAt(0) + index) % speciesList.length];
+  };
+
   return words.map((w, index) => {
     let stage: KnowledgeGardenWordPlant['stage'] = 'seed';
+    let growthPercent = 20;
+    let masteryTitle = 'Dormant Seed 🌱';
 
-    if (w.mastered) {
+    if (w.mastered || w.masteryLevel === 'mastered') {
       stage = 'permanent_flower';
-    } else if (w.confidenceRating === 'known' || w.masteryLevel === 'almost_mastered' || w.masteryLevel === 'growing') {
+      growthPercent = 100;
+      masteryTitle = 'Mastered Perennial Bloom ⭐';
+    } else if (
+      w.masteryLevel === 'almost_mastered' ||
+      w.masteryLevel === 'growing' ||
+      w.confidenceRating === 'known' ||
+      (w.timesPracticed >= 4 && (w.correctCount || 0) >= 3)
+    ) {
       stage = 'blossom';
-    } else if (w.timesPracticed > 0 || (w.flashcardReviewCount || 0) > 0) {
+      growthPercent = 80;
+      masteryTitle = 'Budding Blossom 🌺';
+    } else if (
+      w.masteryLevel === 'learning' ||
+      w.timesPracticed > 0 ||
+      (w.flashcardReviewCount || 0) > 0 ||
+      (w.spellingAttempts || 0) > 0
+    ) {
       stage = 'sprout';
+      growthPercent = 50;
+      masteryTitle = 'Tender Sprout 🌿';
     } else {
       stage = 'seed';
+      growthPercent = 20;
+      masteryTitle = 'Dormant Seed 🌱';
     }
 
     const emojiIndex = Math.abs(w.word.charCodeAt(0) + index) % FLOWER_EMOJIS.length;
     const colorIndex = Math.abs(w.word.charCodeAt(w.word.length - 1) + index) % FLOWER_COLORS.length;
+    const species = getSpeciesForWord(w, index);
 
     return {
       wordId: w.id,
@@ -495,6 +544,12 @@ export const getKnowledgeGardenPlants = (words: VocabWord[]): KnowledgeGardenWor
       stage,
       flowerEmoji: stage === 'seed' ? '🌱' : stage === 'sprout' ? '🌿' : FLOWER_EMOJIS[emojiIndex],
       flowerColor: FLOWER_COLORS[colorIndex],
+      flowerSpecies: species,
+      growthPercent,
+      masteryTitle,
+      category: w.category,
+      masteryLevel: w.masteryLevel,
+      confidenceRating: w.confidenceRating,
       masteryDate: w.mastered ? w.lastPracticedDate || 'Recently Mastered' : undefined,
       timesPracticed: w.timesPracticed
     };

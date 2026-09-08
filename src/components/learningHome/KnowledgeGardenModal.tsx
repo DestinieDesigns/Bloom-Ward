@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { KnowledgeGardenWordPlant, VocabWord } from '../../types';
 import { getKnowledgeGardenPlants } from '../../utils/learningHomeHelper';
+import { GardenPlantAsset } from './GardenPlantAsset';
 import { sound } from '../../utils/audio';
 
 interface KnowledgeGardenModalProps {
@@ -177,14 +178,13 @@ export const KnowledgeGardenModal: React.FC<KnowledgeGardenModalProps> = ({
                   }`}
                 >
                   {/* Plant Stage Graphic */}
-                  <div className="flex-1 flex flex-col items-center justify-center">
-                    <span
-                      className={`text-4xl sm:text-5xl transition-transform group-hover:scale-115 ${
-                        isMastered ? 'drop-shadow-md animate-pulse duration-1000' : ''
-                      }`}
-                    >
-                      {plant.flowerEmoji}
-                    </span>
+                  <div className="flex-1 flex flex-col items-center justify-center my-1">
+                    <GardenPlantAsset
+                      stage={plant.stage}
+                      species={plant.flowerSpecies}
+                      color={plant.flowerColor}
+                      size="md"
+                    />
                   </div>
 
                   {/* Word title */}
@@ -227,7 +227,14 @@ export const KnowledgeGardenModal: React.FC<KnowledgeGardenModalProps> = ({
         <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full border-4 border-emerald-300 shadow-2xl space-y-4 animate-in zoom-in-95">
             <div className="flex items-center justify-between">
-              <span className="text-4xl">{activePlant.flowerEmoji}</span>
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                <GardenPlantAsset
+                  stage={activePlant.stage}
+                  species={activePlant.flowerSpecies}
+                  color={activePlant.flowerColor}
+                  size="md"
+                />
+              </div>
               <button
                 onClick={() => setActivePlant(null)}
                 className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"

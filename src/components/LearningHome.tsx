@@ -41,6 +41,7 @@ import {
   updateStickerBookProgression
 } from '../utils/learningHomeHelper';
 import { RoomCanvas } from './learningHome/RoomCanvas';
+import { KnowledgeGardenView } from './learningHome/KnowledgeGardenView';
 import { CollectionDrawer } from './learningHome/CollectionDrawer';
 import { StickerBookModal } from './learningHome/StickerBookModal';
 import { KnowledgeGardenModal } from './learningHome/KnowledgeGardenModal';
@@ -66,6 +67,13 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
   // Master Home State
   const [homeState, setHomeState] = useState<UserLearningHomeState>(() => {
     return profile.learningHomeState || loadLearningHomeState();
+  });
+
+  // Active Main View: Room Canvas vs Botanical Knowledge Garden
+  const [activeMainView, setActiveMainView] = useState<'room' | 'garden'>(() => {
+    return (profile.learningHomeState || loadLearningHomeState()).activeRoomId === 'knowledge_garden'
+      ? 'garden'
+      : 'room';
   });
 
   // Sticker Book State
@@ -268,9 +276,9 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 font-['Quicksand'] animate-in fade-in">
-      {/* 🏡 Top Header with Room Selector, Theme, and Mode Toggles */}
-      <div className="bg-white/90 backdrop-blur-md rounded-3xl p-4 sm:p-5 border-2 border-pink-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      {/* 🏡 Top Header with Room Selector, View Switcher, Theme, and Mode Toggles */}
+      <div className="bg-white/90 backdrop-blur-md rounded-3xl p-4 sm:p-5 border-2 border-pink-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => {
               sound.playPop();
@@ -290,99 +298,160 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
               </span>
             </div>
           </button>
-        </div>
 
-        {/* Action Controls: Decorate Mode vs Play Mode + Theme */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {/* Theme Dropdown Toggle */}
-          <div className="relative">
+          {/* Primary View Switcher: Room Canvas vs Botanical Knowledge Garden */}
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
             <button
+              id="view-mode-room-btn"
               onClick={() => {
                 sound.playPop();
-                setIsThemeMenuOpen(!isThemeMenuOpen);
-              }}
-              className="px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-              title="Change Room Atmosphere"
-            >
-              <Palette className="w-4 h-4 text-pink-500" />
-              <span className="hidden sm:inline">Theme</span>
-            </button>
-
-            {/* Theme Dropdown Menu */}
-            {isThemeMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border-2 border-pink-200 p-2 z-50 space-y-1 animate-in zoom-in-95">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 block">
-                  Room Atmospheres
-                </span>
-                {ROOM_THEME_OPTIONS.map((theme) => (
-                  <button
-                    key={theme.id}
-                    onClick={() => handleSelectTheme(theme.id)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
-                      activeRoom.styleTheme === theme.id
-                        ? 'bg-pink-100 text-pink-800'
-                        : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <span>{theme.icon}</span>
-                    <span className="truncate">{theme.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Mode Toggle: Decorating vs Play/Explore */}
-          <div className="flex bg-slate-100 p-1 rounded-2xl">
-            <button
-              onClick={() => {
-                sound.playPop();
-                setIsDecoratingMode(true);
+                setActiveMainView('room');
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                isDecoratingMode
+                activeMainView === 'room'
                   ? 'bg-pink-500 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Brush className="w-3.5 h-3.5" />
-              <span>Decorate</span>
+              <span>🏡</span>
+              <span>Room Canvas</span>
             </button>
             <button
+              id="view-mode-garden-btn"
               onClick={() => {
                 sound.playPop();
-                setIsDecoratingMode(false);
+                setActiveMainView('garden');
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                !isDecoratingMode
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                activeMainView === 'garden'
+                  ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Explore</span>
+              <span>🌳</span>
+              <span>Knowledge Garden</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-white/25 text-[10px]">
+                {masteredWordsCount}
+              </span>
             </button>
           </div>
-
-          {/* Reset Room Button */}
-          <button
-            onClick={handleResetRoom}
-            className="p-2 rounded-2xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 cursor-pointer transition-colors"
-            title="Reset Room Layout"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
         </div>
+
+        {/* Action Controls for Active Room */}
+        {activeMainView === 'room' ? (
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            {/* Theme Dropdown Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  sound.playPop();
+                  setIsThemeMenuOpen(!isThemeMenuOpen);
+                }}
+                className="px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                title="Change Room Atmosphere"
+              >
+                <Palette className="w-4 h-4 text-pink-500" />
+                <span className="hidden sm:inline">Theme</span>
+              </button>
+
+              {/* Theme Dropdown Menu */}
+              {isThemeMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border-2 border-pink-200 p-2 z-50 space-y-1 animate-in zoom-in-95">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 block">
+                    Room Atmospheres
+                  </span>
+                  {ROOM_THEME_OPTIONS.map((theme) => (
+                    <button
+                      key={theme.id}
+                      onClick={() => handleSelectTheme(theme.id)}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+                        activeRoom.styleTheme === theme.id
+                          ? 'bg-pink-100 text-pink-800'
+                          : 'hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <span>{theme.icon}</span>
+                      <span className="truncate">{theme.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Mode Toggle: Decorating vs Play/Explore */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl">
+              <button
+                onClick={() => {
+                  sound.playPop();
+                  setIsDecoratingMode(true);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
+                  isDecoratingMode
+                    ? 'bg-pink-500 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Brush className="w-3.5 h-3.5" />
+                <span>Decorate</span>
+              </button>
+              <button
+                onClick={() => {
+                  sound.playPop();
+                  setIsDecoratingMode(false);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
+                  !isDecoratingMode
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Explore</span>
+              </button>
+            </div>
+
+            {/* Reset Room Button */}
+            <button
+              onClick={handleResetRoom}
+              className="p-2 rounded-2xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 cursor-pointer transition-colors"
+              title="Reset Room Layout"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveMainView('room');
+              }}
+              className="px-3.5 py-2 rounded-2xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <span>🏡</span>
+              <span>Back to Room Canvas</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 🏡 Interactive Room Canvas */}
-      <RoomCanvas
-        room={activeRoom}
-        onUpdatePlacedItems={handleUpdatePlacedItems}
-        onRemoveItem={handleRemoveItem}
-        onSelectSection={onSelectSection}
-        isDecoratingMode={isDecoratingMode}
-      />
+      {/* 🌳 Interactive Knowledge Garden View or 🏡 Room Canvas */}
+      {activeMainView === 'garden' ? (
+        <KnowledgeGardenView
+          profile={profile}
+          words={words}
+          onSelectSection={onSelectSection}
+          onSwitchToRoomDecorator={() => setActiveMainView('room')}
+        />
+      ) : (
+        <RoomCanvas
+          room={activeRoom}
+          onUpdatePlacedItems={handleUpdatePlacedItems}
+          onRemoveItem={handleRemoveItem}
+          onSelectSection={onSelectSection}
+          isDecoratingMode={isDecoratingMode}
+        />
+      )}
 
       {/* 🎒 Bottom Feature Dock / Tool Buttons */}
       <div className="bg-white/90 backdrop-blur-md rounded-3xl p-3 sm:p-4 border-2 border-pink-100 shadow-sm flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
@@ -423,9 +492,13 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
           id="home-open-garden-btn"
           onClick={() => {
             sound.playPop();
-            setIsGardenOpen(true);
+            setActiveMainView(activeMainView === 'garden' ? 'room' : 'garden');
           }}
-          className="flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 ${
+            activeMainView === 'garden'
+              ? 'bg-emerald-700 text-white ring-2 ring-emerald-300'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+          }`}
         >
           <span className="text-base">🌳</span>
           <span>Knowledge Garden</span>
@@ -488,6 +561,11 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
         rooms={homeState.rooms}
         activeRoomId={homeState.activeRoomId}
         onSelectRoom={(roomId) => {
+          if (roomId === 'knowledge_garden') {
+            setActiveMainView('garden');
+          } else {
+            setActiveMainView('room');
+          }
           persistHomeState({
             ...homeState,
             activeRoomId: roomId
