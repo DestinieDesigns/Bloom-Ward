@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
   GoogleAuthProvider,
   signInWithPopup,
   signOut
@@ -37,6 +38,21 @@ interface AuthContextType {
     theme: ThemeId,
     dailyGoal: number
   ) => Promise<{ success: boolean; error?: string }>;
+  signInWithStudentCode: (username: string, passcode: string) => Promise<{ success: boolean; error?: string }>;
+  signUpWithStudentCode: (
+    username: string,
+    passcode: string,
+    studentName: string,
+    avatar: string,
+    theme: ThemeId,
+    dailyGoal: number
+  ) => Promise<{ success: boolean; error?: string }>;
+  startInstantStudentPlay: (
+    studentName: string,
+    avatar: string,
+    theme: ThemeId,
+    dailyGoal?: number
+  ) => Promise<{ success: boolean; error?: string }>;
   signOutUser: () => Promise<void>;
   startGuestMode: (name?: string, avatar?: string, theme?: ThemeId) => void;
   createProfile: (data: {
@@ -51,6 +67,20 @@ interface AuthContextType {
   deleteProfile: (profileId: string) => Promise<boolean>;
   setGuestProfile: (profile: UserProfile) => void;
 }
+
+export const formatStudentEmailAlias = (username: string): string => {
+  const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const finalUser = clean.length >= 2 ? clean : `student_${clean || 'user'}_${Date.now().toString().slice(-4)}`;
+  return `${finalUser}@student.bloomword.app`;
+};
+
+export const formatStudentPassword = (passcode: string): string => {
+  const clean = passcode.trim();
+  if (clean.length < 6) {
+    return `${clean}bloom123`.slice(0, 8);
+  }
+  return clean;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -261,6 +291,160 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Student Sign Up with Username & Secret Passcode (NO EMAIL NEEDED!)
+  const signUpWithStudentCode = async (
+    username: string,
+    passcode: string,
+    studentName: string,
+    avatar: string,
+    theme: ThemeId,
+    dailyGoal: number
+  ) => {
+    if (!auth) {
+      startGuestMode(studentName || username, avatar, theme);
+      return { success: true };
+    }
+
+    const cleanUser = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!cleanUser) {
+      return { success: false, error: 'Please choose a nickname with letters or numbers.' };
+    }
+    if (!passcode.trim()) {
+      return { success: false, error: 'Please enter a secret code or PIN so you can log back in.' };
+    }
+
+    const studentEmail = formatStudentEmailAlias(cleanUser);
+    const studentPass = formatStudentPassword(passcode);
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, studentEmail, studentPass);
+      setUser(cred.user);
+      setIsGuest(false);
+      try {
+        localStorage.removeItem('bloomword_is_guest');
+      } catch {}
+
+      const newStudentProfile: UserProfile = {
+        ...createFreshProfile(studentName.trim() || username.trim(), avatar || '🌸', theme || 'pink_garden'),
+        id: `prof-${Date.now()}`,
+        accountId: cred.user.uid,
+        dailyReadingGoalMinutes: dailyGoal || 15,
+        onboardingCompleted: true
+      };
+
+      await syncService.saveStudentProfileCloud(cred.user.uid, newStudentProfile);
+      setProfiles([newStudentProfile]);
+      setActiveProfile(newStudentProfile);
+      saveProfile(newStudentProfile);
+
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Student sign up error:', err);
+      let friendlyError = 'Could not create student account. Please try again.';
+      if (err.code === 'auth/email-already-in-use') {
+        friendlyError = `Nickname "${cleanUser}" is already taken! Try adding your favorite number (like ${cleanUser}7) or log in with your secret code.`;
+      } else if (err.code === 'auth/weak-password') {
+        friendlyError = 'Secret code should be at least 4 characters or numbers.';
+      }
+      return { success: false, error: friendlyError };
+    }
+  };
+
+  // Student Sign In with Username & Secret Passcode (NO EMAIL NEEDED!)
+  const signInWithStudentCode = async (username: string, passcode: string) => {
+    if (!auth) {
+      return { success: false, error: 'Authentication is currently in offline mode.' };
+    }
+
+    const cleanUser = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!cleanUser) {
+      return { success: false, error: 'Please enter your student nickname.' };
+    }
+    if (!passcode.trim()) {
+      return { success: false, error: 'Please enter your secret code or PIN.' };
+    }
+
+    const studentEmail = formatStudentEmailAlias(cleanUser);
+    const studentPass = formatStudentPassword(passcode);
+
+    try {
+      const cred = await signInWithEmailAndPassword(auth, studentEmail, studentPass);
+      setUser(cred.user);
+      setIsGuest(false);
+      try {
+        localStorage.removeItem('bloomword_is_guest');
+      } catch {}
+
+      const cloudProfiles = await syncService.loadStudentProfilesCloud(cred.user.uid);
+      if (cloudProfiles.length > 0) {
+        setProfiles(cloudProfiles);
+        setActiveProfile(cloudProfiles[0]);
+        saveProfile(cloudProfiles[0]);
+      } else {
+        const initial = {
+          ...createFreshProfile(username.trim() || 'Young Explorer', '🌸', 'pink_garden'),
+          accountId: cred.user.uid
+        };
+        await syncService.saveStudentProfileCloud(cred.user.uid, initial);
+        setProfiles([initial]);
+        setActiveProfile(initial);
+        saveProfile(initial);
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Student sign in error:', err);
+      let friendlyError = 'Incorrect nickname or secret code. Please try again!';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        friendlyError = `No student found with nickname "${cleanUser}". Check the spelling or create a new student account!`;
+      } else if (err.code === 'auth/wrong-password') {
+        friendlyError = 'Incorrect secret code for this nickname. Please try again!';
+      }
+      return { success: false, error: friendlyError };
+    }
+  };
+
+  // 1-Click Instant Student Play (Save to cloud anonymously without any password or email!)
+  const startInstantStudentPlay = async (
+    studentName: string,
+    avatar: string,
+    theme: ThemeId,
+    dailyGoal: number = 15
+  ) => {
+    const finalName = studentName.trim() || 'Young Explorer';
+
+    if (auth) {
+      try {
+        const cred = await signInAnonymously(auth);
+        setUser(cred.user);
+        setIsGuest(false);
+        try {
+          localStorage.removeItem('bloomword_is_guest');
+        } catch {}
+
+        const newStudentProfile: UserProfile = {
+          ...createFreshProfile(finalName, avatar || '🌸', theme || 'pink_garden'),
+          id: `prof-${Date.now()}`,
+          accountId: cred.user.uid,
+          dailyReadingGoalMinutes: dailyGoal,
+          onboardingCompleted: true
+        };
+
+        await syncService.saveStudentProfileCloud(cred.user.uid, newStudentProfile);
+        setProfiles([newStudentProfile]);
+        setActiveProfile(newStudentProfile);
+        saveProfile(newStudentProfile);
+
+        return { success: true };
+      } catch (err) {
+        console.warn('Anonymous sign-in error, falling back to local guest mode:', err);
+      }
+    }
+
+    // Fallback: local guest mode
+    startGuestMode(finalName, avatar, theme);
+    return { success: true };
+  };
+
   // Start fresh Guest Mode
   const startGuestMode = (
     name = 'Young Explorer',
@@ -399,6 +583,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithEmail,
         signInWithGoogle,
         signUpWithEmail,
+        signInWithStudentCode,
+        signUpWithStudentCode,
+        startInstantStudentPlay,
         startGuestMode,
         signOutUser,
         createProfile,
