@@ -9,7 +9,8 @@ import {
   UserProfile,
   WeeklyAssessmentResult,
   ReadingSession,
-  BookRecord
+  BookRecord,
+  ThemeId
 } from '../types';
 import { INITIAL_WONDERS_VOCABULARY } from '../data/wondersVocab';
 import { INITIAL_BIBLE_WORDS } from '../data/bibleWords';
@@ -30,67 +31,9 @@ const STORAGE_KEYS = {
   BOOKS: 'bloomword_books_v1'
 };
 
-const INITIAL_BOOKS: BookRecord[] = [
-  {
-    id: 'book-1',
-    title: "Charlotte's Web",
-    author: 'E.B. White',
-    totalMinutesRead: 60,
-    sessionsCount: 4,
-    wordsDiscoveredCount: 3,
-    status: 'reading',
-    lastReadDate: new Date().toISOString().split('T')[0]
-  },
-  {
-    id: 'book-2',
-    title: 'The Secret Garden',
-    author: 'Frances Hodgson Burnett',
-    totalMinutesRead: 45,
-    sessionsCount: 3,
-    wordsDiscoveredCount: 4,
-    status: 'reading',
-    lastReadDate: new Date().toISOString().split('T')[0]
-  },
-  {
-    id: 'book-3',
-    title: 'The Lion, the Witch and the Wardrobe',
-    author: 'C.S. Lewis',
-    totalMinutesRead: 30,
-    sessionsCount: 2,
-    wordsDiscoveredCount: 2,
-    status: 'reading',
-    lastReadDate: new Date().toISOString().split('T')[0]
-  }
-];
+const INITIAL_BOOKS: BookRecord[] = [];
 
-const INITIAL_READING_SESSIONS: ReadingSession[] = [
-  {
-    id: 'session-1',
-    date: 'Yesterday',
-    bookTitle: "Charlotte's Web",
-    bookAuthor: 'E.B. White',
-    startPage: 42,
-    endPage: 54,
-    minutesRead: 15,
-    targetMinutes: 15,
-    wordsDiscovered: ['magnificent', 'curious'],
-    xpEarned: 35,
-    theme: 'pink_garden'
-  },
-  {
-    id: 'session-2',
-    date: '2 days ago',
-    bookTitle: 'The Secret Garden',
-    bookAuthor: 'Frances Hodgson Burnett',
-    startPage: 12,
-    endPage: 25,
-    minutesRead: 20,
-    targetMinutes: 15,
-    wordsDiscovered: ['fragile', 'wilderness'],
-    xpEarned: 45,
-    theme: 'pink_garden'
-  }
-];
+const INITIAL_READING_SESSIONS: ReadingSession[] = [];
 
 export const getStoredBooks = (): BookRecord[] => {
   try {
@@ -127,7 +70,14 @@ export const getStoredWords = (): VocabWord[] => {
   } catch {
     // ignore
   }
-  return INITIAL_WONDERS_VOCABULARY;
+  return INITIAL_WONDERS_VOCABULARY.map((w) => ({
+    ...w,
+    timesPracticed: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    mastered: false,
+    masteryLevel: 'new'
+  }));
 };
 
 export const saveStoredWords = (words: VocabWord[]) => {
@@ -228,48 +178,72 @@ export const saveStoredBadges = (badges: AchievementBadge[]) => {
   }
 };
 
-export const DEFAULT_PROFILE: UserProfile = {
-  id: 'prof-default',
-  name: 'Sophia',
-  avatar: '🌸',
-  level: 2,
-  xp: 185,
-  streak: 3,
+export const createFreshProfile = (
+  name = 'Young Explorer',
+  avatar = '🌸',
+  theme: ThemeId = 'pink_garden'
+): UserProfile => ({
+  id: `prof-${Date.now()}`,
+  name,
+  avatar,
+  level: 1,
+  xp: 0,
+  streak: 0,
   lastActiveDate: new Date().toISOString().split('T')[0],
-  weeklyGoalCompleted: 12,
-  weeklyGoalTotal: 20,
+  weeklyGoalCompleted: 0,
+  weeklyGoalTotal: 15,
   soundEnabled: true,
   speechSpeed: 0.85,
-  currentPathLevel: 2,
-  theme: 'pink_garden',
-  learningLevel: 'intermediate',
-  interests: ['🌸 Gardens', '📚 Reading', '🐾 Animals'],
+  currentPathLevel: 1,
+  theme,
+  learningLevel: 'elementary',
+  interests: ['🌸 Gardens', '📚 Reading'],
   dailyReadingGoalMinutes: 15,
-  readingStreak: 4,
-  longestReadingStreak: 7,
-  totalReadingMinutes: 135,
-  totalReadingSessions: 9,
-  lastReadingDate: new Date().toISOString().split('T')[0],
-  onboardingCompleted: true,
-  initialAssessmentCompleted: true
-};
+  readingStreak: 0,
+  longestReadingStreak: 0,
+  totalReadingMinutes: 0,
+  totalReadingSessions: 0,
+  lastReadingDate: '',
+  onboardingCompleted: false,
+  initialAssessmentCompleted: false
+});
+
+export const DEFAULT_PROFILE: UserProfile = createFreshProfile();
 
 export const getStoredProfile = (): UserProfile => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_PROFILE, ...parsed };
+      // Clean up legacy test profile "Sophia" so user starts fresh
+      if (parsed.id === 'prof-default' || parsed.name === 'Sophia') {
+        localStorage.removeItem(STORAGE_KEYS.PROFILE);
+        localStorage.removeItem(STORAGE_KEYS.BOOKS);
+        localStorage.removeItem(STORAGE_KEYS.READING_SESSIONS);
+        localStorage.removeItem(STORAGE_KEYS.WEEKLY_CHECKS);
+        localStorage.removeItem(STORAGE_KEYS.VOCAB);
+        return createFreshProfile();
+      }
+      return { ...createFreshProfile(), ...parsed };
     }
   } catch {
     // ignore
   }
-  return DEFAULT_PROFILE;
+  return createFreshProfile();
 };
 
 export const saveStoredProfile = (profile: UserProfile) => {
   try {
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+  } catch {
+    // ignore
+  }
+};
+
+export const clearAllLocalUserData = () => {
+  try {
+    Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+    localStorage.removeItem('bloomword_is_guest');
   } catch {
     // ignore
   }
@@ -282,17 +256,7 @@ export const getStoredWeeklyAssessments = (): WeeklyAssessmentResult[] => {
   } catch {
     // ignore
   }
-  return [
-    {
-      id: 'prev-1',
-      date: 'Last Week',
-      score: 88,
-      totalQuestions: 10,
-      strengths: ['Definition Mastery', 'Bible Word Meanings', 'Short Word Spelling'],
-      areasToPractice: ['Words with multiple syllables (perseverance)', 'Fill in the blank context'],
-      wordsTested: ['beautiful', 'fragile', 'Shalom', 'generous', 'courageous', 'perseverance']
-    }
-  ];
+  return [];
 };
 
 export const saveStoredWeeklyAssessments = (history: WeeklyAssessmentResult[]) => {

@@ -4,6 +4,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
   signOut
 } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -12,17 +14,21 @@ import { UserProfile, ThemeId, LearningLevel } from '../types';
 import {
   loadProfile,
   saveProfile,
-  DEFAULT_PROFILE
+  DEFAULT_PROFILE,
+  createFreshProfile,
+  clearAllLocalUserData
 } from '../utils/storage';
 
 interface AuthContextType {
   user: User | null;
+  isGuest: boolean;
   isCloudActive: boolean;
   syncStatus: SyncStatus;
   profiles: UserProfile[];
   activeProfile: UserProfile;
   isLoading: boolean;
   signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signUpWithEmail: (
     email: string,
     password: string,
@@ -32,6 +38,7 @@ interface AuthContextType {
     dailyGoal: number
   ) => Promise<{ success: boolean; error?: string }>;
   signOutUser: () => Promise<void>;
+  startGuestMode: (name?: string, avatar?: string, theme?: ThemeId) => void;
   createProfile: (data: {
     name: string;
     avatar: string;
@@ -49,6 +56,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isGuest, setIsGuest] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bloomword_is_guest') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<UserProfile>(loadProfile);
@@ -73,20 +87,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(currentUser);
 
       if (currentUser) {
+        setIsGuest(false);
+        try {
+          localStorage.removeItem('bloomword_is_guest');
+        } catch {}
+
         // Load cloud student profiles for this account
         try {
           const cloudProfiles = await syncService.loadStudentProfilesCloud(currentUser.uid);
           if (cloudProfiles.length > 0) {
             setProfiles(cloudProfiles);
-            // Select first profile or previously active
             const target = cloudProfiles[0];
             setActiveProfile(target);
             saveProfile(target);
           } else {
-            // First time cloud user with existing local profile: migrate/create initial profile
+            // First time cloud user: create a fresh profile
+            const displayName = currentUser.displayName || 'Young Explorer';
             const initial: UserProfile = {
-              ...activeProfile,
-              id: activeProfile.id || `prof-${Date.now()}`,
+              ...createFreshProfile(displayName, '🌸', 'pink_garden'),
               accountId: currentUser.uid
             };
             await syncService.saveStudentProfileCloud(currentUser.uid, initial);
@@ -98,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('Could not load cloud profiles, using local:', err);
         }
       } else {
-        // Logged out / guest mode
+        // Logged out
         const local = loadProfile();
         setProfiles([local]);
         setActiveProfile(local);
@@ -118,6 +136,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
       setUser(cred.user);
+      setIsGuest(false);
+      try {
+        localStorage.removeItem('bloomword_is_guest');
+      } catch {}
 
       // Load cloud profiles
       const cloudProfiles = await syncService.loadStudentProfilesCloud(cred.user.uid);
@@ -125,6 +147,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfiles(cloudProfiles);
         setActiveProfile(cloudProfiles[0]);
         saveProfile(cloudProfiles[0]);
+      } else {
+        const initial = {
+          ...createFreshProfile('Young Explorer', '🌸', 'pink_garden'),
+          accountId: cred.user.uid
+        };
+        await syncService.saveStudentProfileCloud(cred.user.uid, initial);
+        setProfiles([initial]);
+        setActiveProfile(initial);
+        saveProfile(initial);
       }
       return { success: true };
     } catch (err: any) {
@@ -139,6 +170,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         friendlyError = 'Email or password incorrect. Please try again.';
       }
       return { success: false, error: friendlyError };
+    }
+  };
+
+  // Sign In with Google
+  const signInWithGoogle = async () => {
+    if (!auth) {
+      return { success: false, error: 'Authentication is currently in offline mode.' };
+    }
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      setUser(cred.user);
+      setIsGuest(false);
+      try {
+        localStorage.removeItem('bloomword_is_guest');
+      } catch {}
+
+      const cloudProfiles = await syncService.loadStudentProfilesCloud(cred.user.uid);
+      if (cloudProfiles.length > 0) {
+        setProfiles(cloudProfiles);
+        setActiveProfile(cloudProfiles[0]);
+        saveProfile(cloudProfiles[0]);
+      } else {
+        const displayName = cred.user.displayName || 'Young Explorer';
+        const initial = {
+          ...createFreshProfile(displayName, '🌸', 'pink_garden'),
+          accountId: cred.user.uid
+        };
+        await syncService.saveStudentProfileCloud(cred.user.uid, initial);
+        setProfiles([initial]);
+        setActiveProfile(initial);
+        saveProfile(initial);
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Google sign in error:', err);
+      return { success: false, error: err.message || 'Could not sign in with Google.' };
     }
   };
 
@@ -158,14 +227,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       setUser(cred.user);
+      setIsGuest(false);
+      try {
+        localStorage.removeItem('bloomword_is_guest');
+      } catch {}
 
+      // Brand new fresh profile with 0 XP and level 1
       const newStudentProfile: UserProfile = {
-        ...DEFAULT_PROFILE,
+        ...createFreshProfile(studentName.trim() || 'Young Explorer', avatar || '🌸', theme || 'pink_garden'),
         id: `prof-${Date.now()}`,
         accountId: cred.user.uid,
-        name: studentName.trim() || 'WordExplorer',
-        avatar: avatar || '🌸',
-        theme: theme || 'pink_garden',
         dailyReadingGoalMinutes: dailyGoal || 15,
         onboardingCompleted: true
       };
@@ -190,15 +261,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Start fresh Guest Mode
+  const startGuestMode = (
+    name = 'Young Explorer',
+    avatar = '🌸',
+    theme: ThemeId = 'pink_garden'
+  ) => {
+    const fresh = createFreshProfile(name, avatar, theme);
+    fresh.accountId = 'guest';
+    saveProfile(fresh);
+    setActiveProfile(fresh);
+    setProfiles([fresh]);
+    setIsGuest(true);
+    try {
+      localStorage.setItem('bloomword_is_guest', 'true');
+    } catch {}
+  };
+
   // Sign Out
   const signOutUser = async () => {
     if (auth) {
-      await signOut(auth);
+      try {
+        await signOut(auth);
+      } catch {}
     }
     setUser(null);
-    const local = loadProfile();
-    setProfiles([local]);
-    setActiveProfile(local);
+    setIsGuest(false);
+    clearAllLocalUserData();
+    const fresh = createFreshProfile();
+    setProfiles([fresh]);
+    setActiveProfile(fresh);
   };
 
   // Create additional student profile (for siblings or family members)
@@ -210,12 +302,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     learningLevel?: LearningLevel;
   }): Promise<UserProfile> => {
     const newProfile: UserProfile = {
-      ...DEFAULT_PROFILE,
+      ...createFreshProfile(data.name.trim() || 'Young Explorer', data.avatar || '🌸', data.theme || 'pink_garden'),
       id: `prof-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       accountId: user ? user.uid : 'guest',
-      name: data.name.trim() || 'Young Explorer',
-      avatar: data.avatar || '🌸',
-      theme: data.theme || 'pink_garden',
       dailyReadingGoalMinutes: data.dailyGoal || 15,
       learningLevel: data.learningLevel || 'elementary',
       onboardingCompleted: true,
@@ -301,13 +390,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        isGuest,
         isCloudActive: !!user,
         syncStatus,
         profiles,
         activeProfile,
         isLoading,
         signInWithEmail,
+        signInWithGoogle,
         signUpWithEmail,
+        startGuestMode,
         signOutUser,
         createProfile,
         switchProfile,

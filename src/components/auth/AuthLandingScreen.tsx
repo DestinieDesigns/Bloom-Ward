@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  X,
   Sparkles,
   Lock,
   Mail,
@@ -9,7 +8,12 @@ import {
   ArrowRight,
   ShieldCheck,
   Check,
-  Palette
+  Palette,
+  Flower2,
+  Compass,
+  Star,
+  Flame,
+  Award
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeId } from '../../types';
@@ -17,18 +21,16 @@ import { THEMES } from '../../data/themes';
 import { sound } from '../../utils/audio';
 import { triggerSparkleConfetti } from '../../utils/storage';
 
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
+interface AuthLandingScreenProps {
+  onGuestStart: (name?: string, avatar?: string, theme?: ThemeId) => void;
 }
 
 const AVATAR_OPTIONS = ['🌸', '🚀', '🐾', '🦄', '🌊', '🎮', '🦋', '🦁', '🐬', '🌟', '📚', '🎨'];
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const AuthLandingScreen: React.FC<AuthLandingScreenProps> = ({ onGuestStart }) => {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
-  const [isSignUp, setIsSignUp] = useState<boolean>(true);
+  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [studentName, setStudentName] = useState('');
@@ -38,32 +40,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
-
-  const handleGoogleSignIn = async () => {
-    setErrorMsg('');
-    setIsSubmitting(true);
-    const res = await signInWithGoogle();
-    setIsSubmitting(false);
-    if (res.success) {
-      sound.playSuccessChime();
-      triggerSparkleConfetti();
-      onClose();
-      if (onSuccess) onSuccess();
-    } else {
-      sound.playWrongAnswer();
-      setErrorMsg(res.error || 'Could not sign in with Google.');
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setIsSubmitting(true);
 
-    if (isSignUp) {
+    if (mode === 'signup') {
       if (!studentName.trim()) {
-        setErrorMsg('Please choose a friendly display name or nickname.');
+        setErrorMsg('Please enter a student nickname or first name.');
         setIsSubmitting(false);
         return;
       }
@@ -79,8 +63,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       if (res.success) {
         sound.playLevelUpFanfare();
         triggerSparkleConfetti();
-        onClose();
-        if (onSuccess) onSuccess();
       } else {
         sound.playWrongAnswer();
         setErrorMsg(res.error || 'Could not create account.');
@@ -90,8 +72,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       setIsSubmitting(false);
       if (res.success) {
         sound.playSuccessChime();
-        onClose();
-        if (onSuccess) onSuccess();
       } else {
         sound.playWrongAnswer();
         setErrorMsg(res.error || 'Could not sign in.');
@@ -99,79 +79,92 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setErrorMsg('');
+    setIsSubmitting(true);
+    const res = await signInWithGoogle();
+    setIsSubmitting(false);
+    if (res.success) {
+      sound.playSuccessChime();
+      triggerSparkleConfetti();
+    } else {
+      sound.playWrongAnswer();
+      setErrorMsg(res.error || 'Could not sign in with Google.');
+    }
+  };
+
+  const handleGuestClick = () => {
+    sound.playPop();
+    onGuestStart(studentName.trim() || 'Young Explorer', selectedAvatar, selectedTheme);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn font-['Quicksand'] overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border-2 border-pink-100 relative text-left my-8">
-        
-        {/* Close button */}
-        <button
-          onClick={() => {
-            sound.playPop();
-            onClose();
-          }}
-          className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-          title="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-indigo-50 text-slate-800 font-['Quicksand'] py-8 px-4 sm:px-6 flex flex-col justify-between">
+      {/* Top Branding Header */}
+      <header className="max-w-4xl mx-auto w-full text-center pt-4 pb-6">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 border border-pink-200 shadow-xs mb-4 text-xs sm:text-sm font-bold text-pink-700">
+          <span className="text-base">🌸</span>
+          <span>Welcome to BloomWord Learning Adventure</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-800 font-extrabold">
+            Fresh for Everyone
+          </span>
+        </div>
 
-        {/* Modal Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-400 via-rose-300 to-indigo-400 shadow-md text-3xl mb-3">
-            {isSignUp ? selectedAvatar : '🌟'}
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800 font-['Fredoka']">
-            {isSignUp ? 'Create Your Learning Account' : 'Welcome to BloomWord'}
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-            {isSignUp
-              ? 'Save your words, reading streaks, and learning adventure securely to the cloud.'
-              : 'Sign in to sync your personal learning journey across all your devices.'}
-          </p>
+        <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-800 tracking-tight font-['Fredoka'] mb-3">
+          Bloom Your Vocabulary & Mind
+        </h1>
+        <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
+          Every student starts with their own fresh garden, level 1 learning path, and personalized reading tracker.
+        </p>
+      </header>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex items-center justify-center gap-2 mt-4 p-1 bg-slate-100 rounded-full max-w-xs mx-auto">
-            <button
-              type="button"
-              onClick={() => {
-                sound.playPop();
-                setIsSignUp(false);
-                setErrorMsg('');
-              }}
-              className={`flex-1 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                !isSignUp
-                  ? 'bg-white text-slate-800 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sound.playPop();
-                setIsSignUp(true);
-                setErrorMsg('');
-              }}
-              className={`flex-1 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                isSignUp
-                  ? 'bg-gradient-to-r from-pink-500 to-indigo-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              New Account
-            </button>
-          </div>
+      {/* Main Authentication Card */}
+      <main className="max-w-xl w-full mx-auto bg-white/95 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-xl border border-pink-100 relative">
+        {/* Mode Switcher Tabs */}
+        <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl mb-6">
+          <button
+            type="button"
+            id="tab-create-account"
+            onClick={() => {
+              sound.playPop();
+              setMode('signup');
+              setErrorMsg('');
+            }}
+            className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+              mode === 'signup'
+                ? 'bg-white text-pink-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            🌸 Create New Account
+          </button>
+
+          <button
+            type="button"
+            id="tab-sign-in"
+            onClick={() => {
+              sound.playPop();
+              setMode('signin');
+              setErrorMsg('');
+            }}
+            className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+              mode === 'signin'
+                ? 'bg-white text-pink-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            🔑 Sign In
+          </button>
         </div>
 
         {/* Google Quick Sign-In */}
-        <div className="mb-4">
+        <div className="mb-5">
           <button
             type="button"
-            id="auth-modal-google-btn"
+            id="google-signin-btn"
             onClick={handleGoogleSignIn}
             disabled={isSubmitting}
-            className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+            className="w-full py-3 px-4 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -191,59 +184,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{isSignUp ? 'Sign up with Google' : 'Sign in with Google'}</span>
+            <span>{mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}</span>
           </button>
 
-          <div className="relative my-3 text-center">
+          <div className="relative my-4 text-center">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
             </div>
-            <span className="relative px-3 bg-white text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              or with email
+            <span className="relative px-3 bg-white text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              or with email & password
             </span>
           </div>
         </div>
 
-        {/* Error Notification */}
+        {/* Error Alert */}
         {errorMsg && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-2xl flex items-center gap-2">
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
             <span>⚠️</span>
             <span>{errorMsg}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* SIGN UP FIELDS */}
-          {isSignUp && (
+          {/* SIGN UP ONLY FIELDS */}
+          {mode === 'signup' && (
             <>
-              {/* Display Name */}
+              {/* Student Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  🎀 Student Display Name / Nickname
+                  👤 Student Nickname or First Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                   <input
                     type="text"
                     required
-                    placeholder="e.g. WordExplorer123 or Mia"
+                    id="input-student-name"
+                    placeholder="e.g. Maya, Lucas, Grace"
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-pink-500 focus:outline-none text-sm transition-colors"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Safe nickname for privacy. Avoid full real names.
-                </p>
               </div>
 
               {/* Avatar Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  🌟 Choose Your Explorer Avatar
+                  ✨ Choose Starting Avatar
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-6 gap-2">
                   {AVATAR_OPTIONS.map((av) => (
                     <button
                       type="button"
@@ -252,9 +242,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                         sound.playPop();
                         setSelectedAvatar(av);
                       }}
-                      className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all cursor-pointer ${
+                      className={`h-11 rounded-xl text-xl flex items-center justify-center transition-all cursor-pointer ${
                         selectedAvatar === av
-                          ? 'bg-pink-100 border-2 border-pink-500 scale-110 shadow-xs'
+                          ? 'bg-pink-100 border-2 border-pink-500 scale-105 shadow-xs'
                           : 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
                       }`}
                     >
@@ -264,43 +254,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 </div>
               </div>
 
-              {/* Theme Choice */}
+              {/* Theme Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  🎨 Choose Your Learning World Theme
+                  🎨 Choose Your Adventure World
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {Object.values(THEMES).map((t) => (
+                  {Object.values(THEMES).slice(0, 3).map((th) => (
                     <button
                       type="button"
-                      key={t.id}
+                      key={th.id}
                       onClick={() => {
                         sound.playPop();
-                        setSelectedTheme(t.id);
+                        setSelectedTheme(th.id);
                       }}
-                      className={`p-2 rounded-xl text-left border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        selectedTheme === t.id
-                          ? 'border-indigo-500 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-200'
-                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2 ${
+                        selectedTheme === th.id
+                          ? 'bg-pink-50 border-pink-400 text-pink-900 shadow-xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                       }`}
                     >
-                      <span className="text-lg">{t.icon}</span>
-                      <span className="truncate">{t.name}</span>
+                      <span className="text-xl">{th.icon}</span>
+                      <div className="truncate">
+                        <div className="text-xs font-bold truncate">{th.name}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Daily Reading Goal */}
+              {/* Daily Goal */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  🎯 Daily Real-Book Reading Goal
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  ⏱️ Daily Reading & Vocab Goal
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { minutes: 15, label: '15 Mins ⭐', desc: 'Recommended' },
-                    { minutes: 30, label: '30 Mins', desc: 'Book Worm' },
-                    { minutes: 60, label: '60 Mins', desc: 'Champion 🏆' }
+                    { minutes: 15, label: '15 Min', desc: 'Light' },
+                    { minutes: 20, label: '20 Min', desc: 'Standard' },
+                    { minutes: 30, label: '30 Min', desc: 'Champion' }
                   ].map((g) => (
                     <button
                       type="button"
@@ -309,10 +301,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                         sound.playPop();
                         setDailyGoal(g.minutes);
                       }}
-                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
                         dailyGoal === g.minutes
                           ? 'bg-orange-50 border-orange-400 text-orange-900 font-bold'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                       }`}
                     >
                       <div className="text-xs font-extrabold">{g.label}</div>
@@ -324,7 +316,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             </>
           )}
 
-          {/* EMAIL & PASSWORD FIELDS (BOTH SIGN IN & SIGN UP) */}
+          {/* Email Address */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               📧 Email Address
@@ -334,6 +326,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               <input
                 type="email"
                 required
+                id="input-email"
                 placeholder="student or parent email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -342,6 +335,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             </div>
           </div>
 
+          {/* Password */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               🔐 Password
@@ -352,6 +346,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 type="password"
                 required
                 minLength={6}
+                id="input-password"
                 placeholder="at least 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -360,44 +355,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="pt-2 space-y-2">
+          {/* Submit Button */}
+          <div className="pt-2">
             <button
               type="submit"
+              id="submit-auth-btn"
               disabled={isSubmitting}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-pink-200 cursor-pointer transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <span>
                 {isSubmitting
-                  ? 'Saving to Cloud...'
-                  : isSignUp
-                  ? '🚀 Create Account & Start Learning'
+                  ? 'Connecting to Cloud...'
+                  : mode === 'signup'
+                  ? '🌸 Create Fresh Account & Start Learning'
                   : '▶ Sign In to My Account'}
               </span>
               <ArrowRight className="w-4 h-4" />
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                sound.playPop();
-                onClose();
-              }}
-              className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer text-center"
-            >
-              Continue on This Device (Guest Mode)
-            </button>
           </div>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+        {/* Guest Start Demo Option */}
+        <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+          <p className="text-xs text-slate-500 mb-2">
+            Just want to explore first? No account required:
+          </p>
+          <button
+            type="button"
+            id="start-guest-btn"
+            onClick={handleGuestClick}
+            className="w-full py-2.5 px-4 rounded-xl border border-dashed border-slate-300 hover:border-pink-400 hover:bg-pink-50/50 text-slate-700 hover:text-pink-700 font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>✨ Continue as Guest (Start Fresh Without Account)</span>
+          </button>
+        </div>
+
+        {/* Security & Safety Note */}
+        <div className="mt-5 pt-3 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-50">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            Kid-safe, private & secure
+            Kid-safe, ad-free & private
           </span>
-          <span>Cloud Progress Sync</span>
+          <span>Synced across all your devices</span>
         </div>
-      </div>
+      </main>
+
+      {/* Footer Info */}
+      <footer className="max-w-4xl mx-auto w-full text-center pt-8 pb-4 text-xs text-slate-400">
+        <p>BloomWord Educational Platform • Wonders 4th Grade Vocabulary & Reading Adventure</p>
+      </footer>
     </div>
   );
 };

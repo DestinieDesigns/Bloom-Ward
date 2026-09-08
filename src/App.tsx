@@ -71,6 +71,7 @@ import { StartingAssessmentResult } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { syncService } from './services/syncService';
 import { AuthModal } from './components/auth/AuthModal';
+import { AuthLandingScreen } from './components/auth/AuthLandingScreen';
 import { ProfileSelectionScreen } from './components/auth/ProfileSelectionScreen';
 import { WelcomeBackScreen } from './components/auth/WelcomeBackScreen';
 import { DiscoveryAssessmentModal } from './components/auth/DiscoveryAssessmentModal';
@@ -79,6 +80,7 @@ import { ParentGateModal } from './components/auth/ParentGateModal';
 function MainAppContent() {
   const {
     user,
+    isGuest,
     isCloudActive,
     syncStatus,
     profiles,
@@ -86,7 +88,9 @@ function MainAppContent() {
     switchProfile,
     updateActiveProfile,
     createProfile,
-    signOutUser
+    startGuestMode,
+    signOutUser,
+    isLoading
   } = useAuth();
 
   // Local state for learning data
@@ -562,6 +566,27 @@ function MainAppContent() {
     triggerCelebrationConfetti();
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-indigo-50 font-['Quicksand']">
+        <div className="w-16 h-16 rounded-3xl bg-white shadow-lg flex items-center justify-center text-4xl mb-3 animate-bounce">
+          🌸
+        </div>
+        <p className="text-sm font-bold text-pink-600">Loading BloomWord Adventure...</p>
+      </div>
+    );
+  }
+
+  if (!user && !isGuest) {
+    return (
+      <AuthLandingScreen
+        onGuestStart={(name, avatar, theme) => {
+          startGuestMode(name, avatar, theme);
+        }}
+      />
+    );
+  }
+
   return (
     <div
       className={`min-h-screen ${currentTheme.bgGradient} text-slate-800 font-['Quicksand'] selection:bg-pink-200 selection:text-pink-900 pb-16 transition-colors duration-500`}
@@ -590,6 +615,8 @@ function MainAppContent() {
         onToggleSound={handleToggleSound}
         syncStatus={syncStatus}
         isCloudActive={isCloudActive}
+        isGuest={isGuest}
+        onSignOut={signOutUser}
         onOpenAuth={() => setShowAuthModal(true)}
         onSwitchProfiles={() => setShowProfileSwitcher(true)}
       />

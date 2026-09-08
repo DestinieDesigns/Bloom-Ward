@@ -34,8 +34,10 @@ interface NavbarProps {
   onToggleSound?: () => void;
   syncStatus?: SyncStatus;
   isCloudActive?: boolean;
+  isGuest?: boolean;
   onOpenAuth?: () => void;
   onSwitchProfiles?: () => void;
+  onSignOut?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,8 +52,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSound,
   syncStatus = 'synced',
   isCloudActive = false,
+  isGuest = false,
   onOpenAuth,
-  onSwitchProfiles
+  onSwitchProfiles,
+  onSignOut
 }) => {
   const activeSec = activeSection || currentSection || 'home';
   const theme = getThemeConfig(profile.theme);
@@ -230,7 +234,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             />
 
             {/* Student Profile Avatar & Quick Menu */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              {isGuest && onOpenAuth && (
+                <button
+                  id="guest-signup-navbar-btn"
+                  onClick={() => {
+                    sound.playPop();
+                    onOpenAuth();
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  title="Create account to save your progress"
+                >
+                  <span>☁️ Sign Up to Save</span>
+                </button>
+              )}
+
               <button
                 id="profile-avatar-btn"
                 onClick={() => {
@@ -260,6 +278,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title="Switch Learner Profile"
                 >
                   Switch
+                </button>
+              )}
+
+              {/* Sign Out Button */}
+              {onSignOut && (
+                <button
+                  id="sign-out-navbar-btn"
+                  onClick={() => {
+                    sound.playPop();
+                    onSignOut();
+                  }}
+                  className="p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-all cursor-pointer text-xs font-bold"
+                  title="Sign Out / Switch Account"
+                >
+                  <span className="hidden sm:inline">Sign Out</span>
+                  <span className="sm:hidden text-xs">🚪</span>
                 </button>
               )}
             </div>

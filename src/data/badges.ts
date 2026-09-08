@@ -7,8 +7,7 @@ export const INITIAL_BADGES: AchievementBadge[] = [
     description: 'Practiced and blossomed your first 10 vocabulary words',
     icon: '🌸',
     category: 'words',
-    unlocked: true,
-    unlockedDate: 'Today'
+    unlocked: false
   },
   {
     id: 'badge-spelling-star',
@@ -16,8 +15,7 @@ export const INITIAL_BADGES: AchievementBadge[] = [
     description: 'Spelled 5 words correctly without missing a letter',
     icon: '✏️',
     category: 'spelling',
-    unlocked: true,
-    unlockedDate: 'Today'
+    unlocked: false
   },
   {
     id: 'badge-streak-7',
@@ -33,8 +31,7 @@ export const INITIAL_BADGES: AchievementBadge[] = [
     description: 'Solved 10 definition mystery challenges',
     icon: '✨',
     category: 'mastery',
-    unlocked: true,
-    unlockedDate: 'Yesterday'
+    unlocked: false
   },
   {
     id: 'badge-reading-explorer',
@@ -42,8 +39,7 @@ export const INITIAL_BADGES: AchievementBadge[] = [
     description: 'Read a story and aced all comprehension questions',
     icon: '📖',
     category: 'reading',
-    unlocked: true,
-    unlockedDate: 'Today'
+    unlocked: false
   },
   {
     id: 'badge-faith-explorer',

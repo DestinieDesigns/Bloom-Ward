@@ -6,30 +6,28 @@ export const INITIAL_GARDEN_PLOTS: GardenPlot[] = [
     name: 'Sweet Pea Peony',
     flowerType: 'Peony',
     color: '#F472B6', // vibrant pink
-    stage: 4, // fully blooming
+    stage: 1, // begins as a tiny sprout ready to grow
     unlocked: true,
     unlockedAtXp: 0,
-    petalCount: 8,
-    specialAccessory: 'sparkle'
+    petalCount: 4
   },
   {
     id: 'plot-2',
     name: 'Gentle Grace Lily',
     flowerType: 'Lily',
     color: '#FBCFE8', // soft pastel pink
-    stage: 3,
-    unlocked: true,
+    stage: 1,
+    unlocked: false,
     unlockedAtXp: 50,
-    petalCount: 6,
-    specialAccessory: 'bow'
+    petalCount: 6
   },
   {
     id: 'plot-3',
     name: 'Wisdom Rose',
     flowerType: 'Rose',
     color: '#EC4899', // hot pink
-    stage: 2,
-    unlocked: true,
+    stage: 1,
+    unlocked: false,
     unlockedAtXp: 150,
     petalCount: 5
   },
@@ -38,8 +36,8 @@ export const INITIAL_GARDEN_PLOTS: GardenPlot[] = [
     name: 'Courage Sunflower',
     flowerType: 'Sunflower',
     color: '#FBBF24', // golden yellow
-    stage: 2,
-    unlocked: true,
+    stage: 1,
+    unlocked: false,
     unlockedAtXp: 250,
     petalCount: 12
   },
@@ -81,8 +79,7 @@ export const INITIAL_GARDEN_PLOTS: GardenPlot[] = [
     stage: 1,
     unlocked: false,
     unlockedAtXp: 1200,
-    petalCount: 14,
-    specialAccessory: 'sparkle'
+    petalCount: 14
   }
 ];
 
@@ -100,7 +97,7 @@ export const INITIAL_GARDEN_PETS: GardenPet[] = [
     name: 'Pip the Hummingbird',
     emoji: '🐦',
     title: 'Sweet Nectar Explorer',
-    unlocked: true,
+    unlocked: false,
     unlockCondition: '3-Day Streak or complete 5 vocabulary games'
   },
   {
