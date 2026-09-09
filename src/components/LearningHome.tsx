@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
-  Palette,
-  Package,
-  BookMarked,
+  ShoppingBag,
+  User,
+  Coins,
+  Flame,
+  Undo2,
+  Check,
+  Gamepad2,
   DoorOpen,
-  RotateCcw,
-  Volume2,
-  HelpCircle,
-  Eye,
-  Brush,
-  ChevronDown,
-  Sprout,
-  CheckCircle2
+  X,
+  Palette
 } from 'lucide-react';
 import {
   AppSection,
@@ -24,13 +22,16 @@ import {
   UserLearningHomeState,
   UserProfile,
   VocabWord,
-  ReadingSession
+  ReadingSession,
+  CharacterState,
+  CharacterCustomization
 } from '../types';
 import {
   ROOM_THEME_OPTIONS,
   INITIAL_ROOMS,
   INITIAL_HOME_ITEMS
 } from '../data/learningHomeData';
+import { STARTER_PACK_ITEM_IDS } from '../data/homeShopCatalog';
 import {
   loadLearningHomeState,
   saveLearningHomeState,
@@ -42,11 +43,15 @@ import {
 } from '../utils/learningHomeHelper';
 import { RoomCanvas } from './learningHome/RoomCanvas';
 import { KnowledgeGardenView } from './learningHome/KnowledgeGardenView';
+import { DecorateDrawer, DecorateMainTab } from './learningHome/DecorateDrawer';
 import { CollectionDrawer } from './learningHome/CollectionDrawer';
 import { StickerBookModal } from './learningHome/StickerBookModal';
 import { KnowledgeGardenModal } from './learningHome/KnowledgeGardenModal';
 import { RoomSwitcherModal } from './learningHome/RoomSwitcherModal';
 import { EarnedGiftModal } from './learningHome/EarnedGiftModal';
+import { HomeShop } from './learningHome/HomeShop';
+import { CharacterCustomizerModal } from './learningHome/CharacterCustomizerModal';
+import { DEFAULT_CHARACTER_CUSTOMIZATION } from './learningHome/HomeCharacter';
 import { sound } from '../utils/audio';
 
 interface LearningHomeProps {
@@ -66,15 +71,36 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
 }) => {
   // Master Home State
   const [homeState, setHomeState] = useState<UserLearningHomeState>(() => {
-    return profile.learningHomeState || loadLearningHomeState();
+    const loaded = profile.learningHomeState || loadLearningHomeState();
+    return {
+      ...loaded,
+      character: loaded.character || {
+        x: 45,
+        y: 65,
+        facing: 'right',
+        animation: 'idle',
+        customization: DEFAULT_CHARACTER_CUSTOMIZATION
+      },
+      learningCoins: typeof profile.learningCoins === 'number'
+        ? profile.learningCoins
+        : typeof loaded.learningCoins === 'number'
+        ? loaded.learningCoins
+        : 350
+    };
   });
 
-  // Active Main View: Room Canvas vs Botanical Knowledge Garden
-  const [activeMainView, setActiveMainView] = useState<'room' | 'garden'>(() => {
-    return (profile.learningHomeState || loadLearningHomeState()).activeRoomId === 'knowledge_garden'
-      ? 'garden'
-      : 'room';
-  });
+  // Active Main View: Room Canvas vs Boutique Shop vs Botanical Knowledge Garden
+  const [activeMainView, setActiveMainView] = useState<'room' | 'shop' | 'garden'>('room');
+
+  // Mode: Default strictly to PLAY MODE (false) as requested in Section 1
+  const [isDecoratingMode, setIsDecoratingMode] = useState<boolean>(false);
+
+  // Decorate Drawer state
+  const [decorateTab, setDecorateTab] = useState<DecorateMainTab>('furniture');
+  const [isDecorateDrawerOpen, setIsDecorateDrawerOpen] = useState<boolean>(false);
+
+  // Undo history for room decorating (up to 20 past configurations)
+  const [history, setHistory] = useState<PlacedHomeItem[][]>([]);
 
   // Sticker Book State
   const [stickers, setStickers] = useState<StickerItem[]>(() => loadStickerBook());
@@ -84,9 +110,11 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
   const [isStickerBookOpen, setIsStickerBookOpen] = useState(false);
   const [isGardenOpen, setIsGardenOpen] = useState(false);
   const [isRoomSwitcherOpen, setIsRoomSwitcherOpen] = useState(false);
-  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
-  const [isDecoratingMode, setIsDecoratingMode] = useState(true);
+  const [isCharacterCustomizerOpen, setIsCharacterCustomizerOpen] = useState(false);
   const [saveToastVisible, setSaveToastVisible] = useState(false);
+
+  // User Coins
+  const userCoins = profile.learningCoins ?? homeState.learningCoins ?? 350;
 
   // Surprise Earned Gift State
   const [earnedGift, setEarnedGift] = useState<{
@@ -94,84 +122,103 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
     reason: string;
   } | null>(null);
 
-  // Check for newly unlocked items or rooms based on learning milestones
+  // Active Room reference
+  const activeRoom: HomeRoom =
+    homeState.rooms[homeState.activeRoomId] || INITIAL_ROOMS.main_room;
+
+  // Persist State helper
+  const persistHomeState = (newState: UserLearningHomeState) => {
+    setHomeState(newState);
+    saveLearningHomeState(newState);
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        learningHomeState: newState,
+        learningCoins: newState.learningCoins
+      });
+    }
+  };
+
+  // Push to Undo history before modifying placed items
+  const pushHistory = (items: PlacedHomeItem[]) => {
+    setHistory((prev) => [items, ...prev].slice(0, 20));
+  };
+
+  // Perform Undo
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    sound.playPop();
+    const previous = history[0];
+    setHistory((prev) => prev.slice(1));
+
+    const updatedRooms = {
+      ...homeState.rooms,
+      [homeState.activeRoomId]: {
+        ...activeRoom,
+        placedItems: previous
+      }
+    };
+    persistHomeState({
+      ...homeState,
+      rooms: updatedRooms
+    });
+  };
+
+  // Sync educational unlocks on mount and when words/reading updates
   useEffect(() => {
-    // 1. Check items
-    const itemUnlockResult = checkEducationalItemUnlocks(
+    const unlockResult = checkEducationalItemUnlocks(
       profile,
       words,
       readingSessions,
       homeState.unlockedItemIds
     );
 
-    // 2. Check rooms
-    const roomUnlockResult = updateRoomUnlockProgression(
+    if (unlockResult.newlyUnlockedItems.length > 0) {
+      const updatedUnlocked = [
+        ...homeState.unlockedItemIds,
+        ...unlockResult.newlyUnlockedItems.map((i) => i.id)
+      ];
+      const updatedState = {
+        ...homeState,
+        unlockedItemIds: updatedUnlocked
+      };
+      persistHomeState(updatedState);
+
+      const firstNewItem = unlockResult.newlyUnlockedItems[0];
+      setEarnedGift({
+        item: firstNewItem,
+        reason: firstNewItem.unlockCondition || 'Learning achievement unlocked!'
+      });
+      sound.playLevelUpFanfare();
+    }
+
+    const { updatedRooms, newlyUnlockedRooms } = updateRoomUnlockProgression(
       profile,
       words,
       readingSessions,
       homeState.rooms
     );
+    if (newlyUnlockedRooms.length > 0) {
+      persistHomeState({
+        ...homeState,
+        rooms: updatedRooms
+      });
+    }
 
-    // 3. Check stickers
-    const stickerUnlockResult = updateStickerBookProgression(
+    const { updatedStickers, newlyUnlockedStickers } = updateStickerBookProgression(
       profile,
       words,
       readingSessions,
       stickers
     );
-
-    let hasStateChange = false;
-    let nextState = { ...homeState };
-
-    if (itemUnlockResult.newlyUnlockedItems.length > 0) {
-      hasStateChange = true;
-      nextState.unlockedItemIds = itemUnlockResult.allUnlockedIds;
-      // Show first new gift
-      const latestGift = itemUnlockResult.newlyUnlockedItems[0];
-      setEarnedGift({
-        item: latestGift,
-        reason: `Earned via your hard work: ${latestGift.unlockCondition}!`
-      });
+    if (newlyUnlockedStickers.length > 0) {
+      setStickers(updatedStickers);
+      saveStickerBook(updatedStickers);
     }
+  }, [words.length, profile.streakDays, readingSessions.length]);
 
-    if (roomUnlockResult.newlyUnlockedRooms.length > 0) {
-      hasStateChange = true;
-      nextState.rooms = roomUnlockResult.updatedRooms;
-    } else {
-      nextState.rooms = roomUnlockResult.updatedRooms;
-    }
-
-    if (stickerUnlockResult.newlyUnlockedStickers.length > 0) {
-      setStickers(stickerUnlockResult.updatedStickers);
-      saveStickerBook(stickerUnlockResult.updatedStickers);
-    }
-
-    if (hasStateChange) {
-      setHomeState(nextState);
-      saveLearningHomeState(nextState);
-      if (onUpdateProfile) {
-        onUpdateProfile({ learningHomeState: nextState });
-      }
-    }
-  }, [profile.xp, profile.streak, profile.totalReadingMinutes, words.length]);
-
-  // Active Room
-  const activeRoom: HomeRoom =
-    homeState.rooms[homeState.activeRoomId] || INITIAL_ROOMS.main_room;
-
-  // Persist helper
-  const persistHomeState = (updatedState: UserLearningHomeState) => {
-    setHomeState(updatedState);
-    saveLearningHomeState(updatedState);
-    if (onUpdateProfile) {
-      onUpdateProfile({ learningHomeState: updatedState });
-    }
-    setSaveToastVisible(true);
-    setTimeout(() => setSaveToastVisible(false), 2000);
-  };
-
-  // Update placed items in current room
+  // Update placed items for active room
   const handleUpdatePlacedItems = (placedItems: PlacedHomeItem[]) => {
+    pushHistory(activeRoom.placedItems);
     const updatedRooms = {
       ...homeState.rooms,
       [homeState.activeRoomId]: {
@@ -183,10 +230,80 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
       ...homeState,
       rooms: updatedRooms
     });
+
+    setSaveToastVisible(true);
+    setTimeout(() => setSaveToastVisible(false), 2000);
   };
 
-  // Place new item from Collection
+  // Update room style (walls, floors, theme)
+  const handleUpdateRoomStyle = (updates: {
+    wallpaperClass?: string;
+    flooringClass?: string;
+    styleTheme?: HomeRoom['styleTheme'];
+  }) => {
+    const updatedRooms = {
+      ...homeState.rooms,
+      [homeState.activeRoomId]: {
+        ...activeRoom,
+        ...updates
+      }
+    };
+    persistHomeState({
+      ...homeState,
+      rooms: updatedRooms
+    });
+  };
+
+  // Update character position/animation
+  const handleUpdateCharacter = (character: CharacterState) => {
+    persistHomeState({
+      ...homeState,
+      character
+    });
+  };
+
+  // Save character customization
+  const handleSaveCharacterCustomization = (customization: CharacterCustomization) => {
+    const updatedChar: CharacterState = {
+      ...homeState.character,
+      customization
+    };
+    persistHomeState({
+      ...homeState,
+      character: updatedChar
+    });
+  };
+
+  // Buy item from boutique shop
+  const handleBuyItem = (item: HomeItem) => {
+    const price = item.price ?? 0;
+    if (userCoins < price) {
+      sound.playPop();
+      return;
+    }
+
+    sound.playSuccessChime();
+    const nextCoins = userCoins - price;
+    const nextUnlocked = Array.from(new Set([...homeState.unlockedItemIds, item.id]));
+
+    const updatedState: UserLearningHomeState = {
+      ...homeState,
+      learningCoins: nextCoins,
+      unlockedItemIds: nextUnlocked
+    };
+
+    persistHomeState(updatedState);
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        learningCoins: nextCoins,
+        learningHomeState: updatedState
+      });
+    }
+  };
+
+  // Place item into room
   const handlePlaceItem = (item: HomeItem) => {
+    sound.playPop();
     const newInstanceId = `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const newItem: PlacedHomeItem = {
       instanceId: newInstanceId,
@@ -200,243 +317,120 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
 
     const updatedPlaced = [...activeRoom.placedItems, newItem];
     handleUpdatePlacedItems(updatedPlaced);
-    setIsCollectionOpen(false);
+    setActiveMainView('room');
   };
 
-  // Place sticker from Sticker Book
-  const handlePlaceStickerInRoom = (sticker: StickerItem) => {
-    // Find or create a matching sticker item
-    let matchingItem = INITIAL_HOME_ITEMS.find((i) => i.name === sticker.name);
-    if (!matchingItem) {
-      matchingItem = {
-        id: sticker.id,
-        name: sticker.name,
-        category: 'sticker',
-        icon: sticker.icon,
-        description: sticker.description,
-        unlocked: true,
-        unlockCondition: sticker.unlockCondition,
-        unlockSource: 'milestone',
-        defaultScale: 1.1,
-        isResizable: true,
-        isRotatable: true
-      };
-    }
-    handlePlaceItem(matchingItem);
-  };
-
-  // Remove item from room back to collection
+  // Remove item from room
   const handleRemoveItem = (instanceId: string) => {
     const updatedPlaced = activeRoom.placedItems.filter((p) => p.instanceId !== instanceId);
     handleUpdatePlacedItems(updatedPlaced);
   };
 
-  // Switch Theme / Style for current room
-  const handleSelectTheme = (themeId: HomeRoom['styleTheme']) => {
+  // Handle switching to Decorate Mode
+  const handleEnterDecorate = () => {
     sound.playPop();
-    const themeDef = ROOM_THEME_OPTIONS.find((t) => t.id === themeId);
-    if (!themeDef) return;
-
-    const updatedRooms = {
-      ...homeState.rooms,
-      [homeState.activeRoomId]: {
-        ...activeRoom,
-        styleTheme: themeId,
-        wallpaperClass: themeDef.wallpaperClass,
-        flooringClass: themeDef.flooringClass
-      }
-    };
-    persistHomeState({
-      ...homeState,
-      rooms: updatedRooms
-    });
-    setIsThemeMenuOpen(false);
+    setIsDecoratingMode(true);
+    setIsDecorateDrawerOpen(true);
+    setDecorateTab('furniture');
+    setActiveMainView('room');
   };
 
-  // Reset current room to starter layout
-  const handleResetRoom = () => {
-    if (!window.confirm('Reset this room back to its cozy starter layout?')) return;
+  // Handle switching to Play Mode
+  const handleEnterPlay = () => {
     sound.playPop();
-    const defaultRoom = INITIAL_ROOMS[homeState.activeRoomId] || INITIAL_ROOMS.main_room;
-    const updatedRooms = {
-      ...homeState.rooms,
-      [homeState.activeRoomId]: {
-        ...activeRoom,
-        placedItems: defaultRoom.placedItems
-      }
-    };
-    persistHomeState({
-      ...homeState,
-      rooms: updatedRooms
-    });
+    setIsDecoratingMode(false);
+    setIsDecorateDrawerOpen(false);
+    setActiveMainView('room');
   };
-
-  // Mastered words count for the garden badge
-  const masteredWordsCount = words.filter((w) => w.mastered).length;
 
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 font-['Quicksand'] animate-in fade-in">
-      {/* 🏡 Top Header with Room Selector, View Switcher, Theme, and Mode Toggles */}
-      <div className="bg-white/90 backdrop-blur-md rounded-3xl p-4 sm:p-5 border-2 border-pink-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5">
+    <div id="learning-home-world" className="space-y-3 max-w-6xl mx-auto pb-12 animate-in fade-in duration-300">
+      {/* ========================================================= */}
+      {/* 🏡 1. MINIMAL TOP BAR: Only My Home, Coins, Streak, Profile */}
+      {/* ========================================================= */}
+      <div className="bg-white/95 backdrop-blur-md rounded-3xl px-4 py-3 border-2 border-amber-100 shadow-2xs flex items-center justify-between gap-3">
+        {/* Left: 🏡 My Home (clicking allows room switching) */}
+        <button
+          id="home-room-title-btn"
+          onClick={() => {
+            sound.playPop();
+            setIsRoomSwitcherOpen(true);
+          }}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-amber-50 hover:bg-amber-100/80 text-amber-950 border border-amber-200 text-xs font-black cursor-pointer transition-all active:scale-95"
+          title="Switch room or haven"
+        >
+          <span className="text-lg">🏡</span>
+          <span className="text-sm font-extrabold tracking-tight">My Home</span>
+          <span className="text-xs text-amber-700/70 font-medium hidden sm:inline">
+            • {activeRoom.name}
+          </span>
+        </button>
+
+        {/* Right: 🪙 Coin Balance, 🔥 Streak, 👤 Profile / Avatar Access */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* 🪙 Coin Balance */}
           <button
+            id="learning-coins-header-pill"
             onClick={() => {
               sound.playPop();
-              setIsRoomSwitcherOpen(true);
+              setActiveMainView(activeMainView === 'shop' ? 'room' : 'shop');
             }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-pink-50 hover:bg-pink-100 border border-pink-200/80 text-pink-900 cursor-pointer transition-all active:scale-95"
-            title="Switch Room"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-100 to-amber-200/90 hover:from-amber-200 hover:to-amber-300 border border-amber-300 px-3 py-1.5 rounded-2xl shadow-2xs transition-transform active:scale-95 cursor-pointer"
+            title="LearningCoins balance. Tap to open Shop!"
           >
-            <span className="text-2xl">{activeRoom.icon}</span>
-            <div className="text-left">
-              <span className="text-[10px] font-bold text-pink-600 block uppercase tracking-wider">
-                Current Room
-              </span>
-              <span className="text-sm font-extrabold text-slate-800 font-['Fredoka'] flex items-center gap-1">
-                {activeRoom.name}
-                <ChevronDown className="w-3.5 h-3.5 text-pink-600" />
-              </span>
-            </div>
+            <span className="text-base">🪙</span>
+            <span className="text-xs sm:text-sm font-black text-amber-950">
+              {userCoins.toLocaleString()}
+            </span>
           </button>
 
-          {/* Primary View Switcher: Room Canvas vs Botanical Knowledge Garden */}
-          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
-            <button
-              id="view-mode-room-btn"
-              onClick={() => {
-                sound.playPop();
-                setActiveMainView('room');
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                activeMainView === 'room'
-                  ? 'bg-pink-500 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>🏡</span>
-              <span>Room Canvas</span>
-            </button>
-            <button
-              id="view-mode-garden-btn"
-              onClick={() => {
-                sound.playPop();
-                setActiveMainView('garden');
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                activeMainView === 'garden'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>🌳</span>
-              <span>Knowledge Garden</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-white/25 text-[10px]">
-                {masteredWordsCount}
-              </span>
-            </button>
+          {/* 🔥 Current Streak */}
+          <div
+            className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-2xl shadow-2xs"
+            title={`Current Learning Streak: ${profile.streakDays || 1} day(s)`}
+          >
+            <span className="text-base">🔥</span>
+            <span className="text-xs sm:text-sm font-black text-rose-800">
+              {profile.streakDays || 1}
+            </span>
           </div>
+
+          {/* 👤 Profile / Avatar Access */}
+          <button
+            id="open-character-customizer-btn"
+            onClick={() => {
+              sound.playPop();
+              setIsCharacterCustomizerOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-extrabold border border-stone-200 cursor-pointer transition-colors active:scale-95"
+            title="Profile & Mini Learner Avatar"
+          >
+            <span className="text-base">👤</span>
+            <span className="hidden sm:inline font-bold">
+              {profile.name ? profile.name.split(' ')[0] : 'Learner'}
+            </span>
+          </button>
         </div>
-
-        {/* Action Controls for Active Room */}
-        {activeMainView === 'room' ? (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            {/* Theme Dropdown Toggle */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  sound.playPop();
-                  setIsThemeMenuOpen(!isThemeMenuOpen);
-                }}
-                className="px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                title="Change Room Atmosphere"
-              >
-                <Palette className="w-4 h-4 text-pink-500" />
-                <span className="hidden sm:inline">Theme</span>
-              </button>
-
-              {/* Theme Dropdown Menu */}
-              {isThemeMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border-2 border-pink-200 p-2 z-50 space-y-1 animate-in zoom-in-95">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 block">
-                    Room Atmospheres
-                  </span>
-                  {ROOM_THEME_OPTIONS.map((theme) => (
-                    <button
-                      key={theme.id}
-                      onClick={() => handleSelectTheme(theme.id)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
-                        activeRoom.styleTheme === theme.id
-                          ? 'bg-pink-100 text-pink-800'
-                          : 'hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      <span>{theme.icon}</span>
-                      <span className="truncate">{theme.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Mode Toggle: Decorating vs Play/Explore */}
-            <div className="flex bg-slate-100 p-1 rounded-2xl">
-              <button
-                onClick={() => {
-                  sound.playPop();
-                  setIsDecoratingMode(true);
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                  isDecoratingMode
-                    ? 'bg-pink-500 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Brush className="w-3.5 h-3.5" />
-                <span>Decorate</span>
-              </button>
-              <button
-                onClick={() => {
-                  sound.playPop();
-                  setIsDecoratingMode(false);
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                  !isDecoratingMode
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Explore</span>
-              </button>
-            </div>
-
-            {/* Reset Room Button */}
-            <button
-              onClick={handleResetRoom}
-              className="p-2 rounded-2xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 cursor-pointer transition-colors"
-              title="Reset Room Layout"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                sound.playPop();
-                setActiveMainView('room');
-              }}
-              className="px-3.5 py-2 rounded-2xl bg-pink-100 hover:bg-pink-200 text-pink-800 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <span>🏡</span>
-              <span>Back to Room Canvas</span>
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* 🌳 Interactive Knowledge Garden View or 🏡 Room Canvas */}
-      {activeMainView === 'garden' ? (
+      {/* ========================================================= */}
+      {/* 🖼️ 2. CENTERPIECE ROOM WORLD OR OVERLAY SHOP */}
+      {/* ========================================================= */}
+      {activeMainView === 'shop' ? (
+        <div className="bg-white rounded-3xl overflow-hidden shadow-xl border-2 border-amber-100 min-h-[580px]">
+          <HomeShop
+            userCoins={userCoins}
+            unlockedItemIds={homeState.unlockedItemIds}
+            onBuyItem={handleBuyItem}
+            onPlaceItem={(item) => {
+              handlePlaceItem(item);
+              setActiveMainView('room');
+              setIsDecoratingMode(true);
+            }}
+            onClose={() => setActiveMainView('room')}
+          />
+        </div>
+      ) : activeMainView === 'garden' ? (
         <KnowledgeGardenView
           profile={profile}
           words={words}
@@ -450,108 +444,175 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
           onRemoveItem={handleRemoveItem}
           onSelectSection={onSelectSection}
           isDecoratingMode={isDecoratingMode}
+          character={homeState.character}
+          onUpdateCharacter={handleUpdateCharacter}
+          themeId={profile.theme}
         />
       )}
 
-      {/* 🎒 Bottom Feature Dock / Tool Buttons */}
-      <div className="bg-white/90 backdrop-blur-md rounded-3xl p-3 sm:p-4 border-2 border-pink-100 shadow-sm flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-        {/* Collection Drawer Button */}
-        <button
-          id="home-open-collection-btn"
-          onClick={() => {
-            sound.playPop();
-            setIsCollectionOpen(true);
-          }}
-          className="flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
-        >
-          <span className="text-base">🎒</span>
-          <span>My Collection</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-white/30 text-[10px]">
-            {homeState.unlockedItemIds.length}
-          </span>
-        </button>
+      {/* ========================================================= */}
+      {/* 🎮 3. BOTTOM NAVIGATION: Progressive Disclosure */}
+      {/* Play Mode -> [Play, Decorate, Shop] */}
+      {/* Decorate Mode -> [Furniture, Decor, Room, Undo, Done] */}
+      {/* ========================================================= */}
+      {activeMainView === 'room' && (
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-2.5 sm:p-3.5 border-2 border-amber-100 shadow-sm flex items-center justify-between gap-2 max-w-2xl mx-auto">
+          {!isDecoratingMode ? (
+            /* --- PLAY MODE: 3 Primary Actions (Section 1) --- */
+            <div className="flex items-center justify-center gap-3 w-full">
+              {/* 🎮 Play */}
+              <button
+                id="home-mode-play-btn"
+                onClick={handleEnterPlay}
+                className="flex-1 py-3 px-4 rounded-2xl bg-amber-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
+              >
+                <Gamepad2 className="w-4 h-4" />
+                <span>Play</span>
+              </button>
 
-        {/* Sticker Book Button */}
-        <button
-          id="home-open-stickerbook-btn"
-          onClick={() => {
-            sound.playPop();
-            setIsStickerBookOpen(true);
-          }}
-          className="flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
-        >
-          <span className="text-base">📒</span>
-          <span>Sticker Book</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-white/30 text-[10px]">
-            {stickers.filter((s) => s.unlocked).length}
-          </span>
-        </button>
+              {/* ✨ Decorate */}
+              <button
+                id="home-mode-decorate-btn"
+                onClick={handleEnterDecorate}
+                className="flex-1 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span>Decorate</span>
+              </button>
 
-        {/* Knowledge Garden Button */}
-        <button
-          id="home-open-garden-btn"
-          onClick={() => {
-            sound.playPop();
-            setActiveMainView(activeMainView === 'garden' ? 'room' : 'garden');
-          }}
-          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 ${
-            activeMainView === 'garden'
-              ? 'bg-emerald-700 text-white ring-2 ring-emerald-300'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-          }`}
-        >
-          <span className="text-base">🌳</span>
-          <span>Knowledge Garden</span>
-          <span className="px-1.5 py-0.2 rounded-full bg-white/30 text-[10px]">
-            {masteredWordsCount}
-          </span>
-        </button>
+              {/* 🛍️ Shop */}
+              <button
+                id="home-mode-shop-btn"
+                onClick={() => {
+                  sound.playPop();
+                  setActiveMainView('shop');
+                }}
+                className="flex-1 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+              >
+                <ShoppingBag className="w-4 h-4 text-amber-600" />
+                <span>Shop</span>
+              </button>
+            </div>
+          ) : (
+            /* --- DECORATE MODE: Dedicated Actions (Section 4) --- */
+            <div className="flex items-center justify-between gap-2 w-full">
+              {/* Categories Pills */}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* 🪑 Furniture */}
+                <button
+                  onClick={() => {
+                    sound.playPop();
+                    setDecorateTab('furniture');
+                    setIsDecorateDrawerOpen(true);
+                  }}
+                  className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    isDecorateDrawerOpen && decorateTab === 'furniture'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
+                  }`}
+                >
+                  <span>🪑</span>
+                  <span>Furniture</span>
+                </button>
 
-        {/* Rooms Switcher Button */}
-        <button
-          id="home-open-rooms-btn"
-          onClick={() => {
-            sound.playPop();
-            setIsRoomSwitcherOpen(true);
-          }}
-          className="py-2.5 px-3.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
-          title="View All Unlocked Rooms"
-        >
-          <DoorOpen className="w-4 h-4" />
-          <span className="hidden sm:inline">Rooms</span>
-        </button>
-      </div>
+                {/* 🌸 Decor */}
+                <button
+                  onClick={() => {
+                    sound.playPop();
+                    setDecorateTab('decor');
+                    setIsDecorateDrawerOpen(true);
+                  }}
+                  className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    isDecorateDrawerOpen && decorateTab === 'decor'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
+                  }`}
+                >
+                  <span>🌸</span>
+                  <span>Decor</span>
+                </button>
 
-      {/* Auto-Save Notification Toast */}
-      {saveToastVisible && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-bottom-3">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>Room design auto-saved! 🏡</span>
+                {/* 🧱 Room */}
+                <button
+                  onClick={() => {
+                    sound.playPop();
+                    setDecorateTab('room');
+                    setIsDecorateDrawerOpen(true);
+                  }}
+                  className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    isDecorateDrawerOpen && decorateTab === 'room'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
+                  }`}
+                >
+                  <span>🧱</span>
+                  <span>Room</span>
+                </button>
+              </div>
+
+              {/* Action Controls: Undo & Done */}
+              <div className="flex items-center gap-1.5">
+                {/* ↩️ Undo */}
+                <button
+                  onClick={handleUndo}
+                  disabled={history.length === 0}
+                  className={`p-2 sm:px-3 sm:py-2 rounded-2xl font-extrabold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
+                    history.length === 0
+                      ? 'text-stone-300 cursor-not-allowed bg-stone-50'
+                      : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                  }`}
+                  title="Undo last change"
+                >
+                  <Undo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Undo</span>
+                </button>
+
+                {/* ✓ Done */}
+                <button
+                  onClick={handleEnterPlay}
+                  className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95"
+                  title="Finish decorating and enter Play Mode"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Done</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 🎒 Collection Drawer Modal */}
-      <CollectionDrawer
-        isOpen={isCollectionOpen}
-        onClose={() => setIsCollectionOpen(false)}
+      {/* ========================================================= */}
+      {/* 🪑 PROGRESSIVE DISCLOSURE DECORATE DRAWER */}
+      {/* ========================================================= */}
+      <DecorateDrawer
+        isOpen={isDecoratingMode && isDecorateDrawerOpen && activeMainView === 'room'}
+        activeTab={decorateTab}
+        onClose={() => setIsDecorateDrawerOpen(false)}
         unlockedItemIds={homeState.unlockedItemIds}
-        placedItems={activeRoom.placedItems}
+        currentRoom={activeRoom}
         onPlaceItem={handlePlaceItem}
+        onUpdateRoomStyle={handleUpdateRoomStyle}
+        onOpenShop={() => {
+          setIsDecorateDrawerOpen(false);
+          setActiveMainView('shop');
+        }}
       />
 
-      {/* 📒 Sticker Book Album Modal */}
-      <StickerBookModal
-        isOpen={isStickerBookOpen}
-        onClose={() => setIsStickerBookOpen(false)}
-        stickers={stickers}
-        onPlaceStickerInRoom={handlePlaceStickerInRoom}
-      />
+      {/* Auto-Save Notification Toast */}
+      {saveToastVisible && (
+        <div className="fixed bottom-6 right-6 z-50 bg-stone-900/90 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-bottom-3">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>Room saved! 🏡</span>
+        </div>
+      )}
 
-      {/* 🌳 Knowledge Garden Modal */}
-      <KnowledgeGardenModal
-        isOpen={isGardenOpen}
-        onClose={() => setIsGardenOpen(false)}
-        words={words}
+      {/* 👤 Character Customizer Modal */}
+      <CharacterCustomizerModal
+        isOpen={isCharacterCustomizerOpen}
+        onClose={() => setIsCharacterCustomizerOpen(false)}
+        customization={homeState.character?.customization || DEFAULT_CHARACTER_CUSTOMIZATION}
+        onSave={handleSaveCharacterCustomization}
       />
 
       {/* 🚪 Room Switcher Modal */}

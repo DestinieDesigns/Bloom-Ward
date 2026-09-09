@@ -7,10 +7,12 @@ import {
   Sparkles,
   Layers,
   Heart,
-  HelpCircle
+  HelpCircle,
+  ShoppingBag
 } from 'lucide-react';
 import { HomeItem, ItemCategory, PlacedHomeItem } from '../../types';
 import { INITIAL_HOME_ITEMS } from '../../data/learningHomeData';
+import { MiniatureFurnitureRenderer } from './MiniatureFurnitureRenderer';
 import { sound } from '../../utils/audio';
 
 interface CollectionDrawerProps {
@@ -19,6 +21,7 @@ interface CollectionDrawerProps {
   unlockedItemIds: string[];
   placedItems: PlacedHomeItem[];
   onPlaceItem: (item: HomeItem) => void;
+  onOpenShop?: () => void;
 }
 
 const CATEGORIES: { id: ItemCategory | 'all'; label: string; icon: string }[] = [
@@ -35,7 +38,8 @@ export const CollectionDrawer: React.FC<CollectionDrawerProps> = ({
   onClose,
   unlockedItemIds,
   placedItems,
-  onPlaceItem
+  onPlaceItem,
+  onOpenShop
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<ItemCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,9 +145,17 @@ export const CollectionDrawer: React.FC<CollectionDrawerProps> = ({
                 >
                   {/* Top Badges */}
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl sm:text-4xl drop-shadow-xs">
-                      {isUnlocked ? item.icon : '❓'}
-                    </span>
+                    <div className="w-14 h-14 flex items-center justify-center">
+                      {isUnlocked ? (
+                        item.renderType ? (
+                          <MiniatureFurnitureRenderer item={item} size="sm" isLit={true} />
+                        ) : (
+                          <span className="text-3xl sm:text-4xl drop-shadow-xs">{item.icon}</span>
+                        )
+                      ) : (
+                        <span className="text-3xl text-stone-400">❓</span>
+                      )}
+                    </div>
 
                     {isUnlocked ? (
                       countInRoom > 0 && (
@@ -208,14 +220,26 @@ export const CollectionDrawer: React.FC<CollectionDrawerProps> = ({
           </div>
         </div>
 
-        {/* Footer info note */}
-        <div className="p-3 bg-pink-50/60 border-t border-pink-100 text-center">
-          <p className="text-[11px] text-pink-900 font-medium flex items-center justify-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+        {/* Footer info note & Shop button */}
+        <div className="p-3 bg-pink-50/60 border-t border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p className="text-[11px] text-pink-900 font-medium flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-pink-500 shrink-0" />
             <span>
-              Every book read, word mastered, and spelling test completed unlocks new surprises!
+              Every book read, word mastered, and test unlocks new items!
             </span>
           </p>
+          {onOpenShop && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenShop();
+              }}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all shrink-0"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Browse Furniture Shop</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

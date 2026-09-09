@@ -16,6 +16,8 @@ import {
   INITIAL_ROOMS,
   INITIAL_STICKERS
 } from '../data/learningHomeData';
+import { STARTER_PACK_ITEM_IDS } from '../data/homeShopCatalog';
+import { DEFAULT_CHARACTER_CUSTOMIZATION } from '../components/learningHome/HomeCharacter';
 
 const STORAGE_KEYS = {
   HOME_STATE: 'bloomword_learning_home_v1',
@@ -27,6 +29,9 @@ export const loadLearningHomeState = (): UserLearningHomeState => {
     const saved = localStorage.getItem(STORAGE_KEYS.HOME_STATE);
     if (saved) {
       const parsed = JSON.parse(saved);
+      const existingUnlocked = parsed.unlockedItemIds || [];
+      const mergedUnlocked = Array.from(new Set([...STARTER_PACK_ITEM_IDS, ...existingUnlocked]));
+
       // Merge with any new default rooms or items in case of updates
       return {
         activeRoomId: parsed.activeRoomId || 'main_room',
@@ -34,11 +39,17 @@ export const loadLearningHomeState = (): UserLearningHomeState => {
           ...INITIAL_ROOMS,
           ...parsed.rooms
         },
-        unlockedItemIds: parsed.unlockedItemIds?.length
-          ? parsed.unlockedItemIds
-          : INITIAL_HOME_ITEMS.filter((i) => i.unlocked).map((i) => i.id),
+        unlockedItemIds: mergedUnlocked,
         collectedStickerIds: parsed.collectedStickerIds || ['stk-curious-sprout', 'stk-spelling-bee'],
-        lastEarnedGift: parsed.lastEarnedGift
+        lastEarnedGift: parsed.lastEarnedGift,
+        character: parsed.character || {
+          x: 45,
+          y: 65,
+          facing: 'right',
+          animation: 'idle',
+          customization: DEFAULT_CHARACTER_CUSTOMIZATION
+        },
+        learningCoins: typeof parsed.learningCoins === 'number' ? parsed.learningCoins : 350
       };
     }
   } catch (err) {
@@ -48,8 +59,16 @@ export const loadLearningHomeState = (): UserLearningHomeState => {
   return {
     activeRoomId: 'main_room',
     rooms: INITIAL_ROOMS,
-    unlockedItemIds: INITIAL_HOME_ITEMS.filter((i) => i.unlocked).map((i) => i.id),
-    collectedStickerIds: ['stk-curious-sprout', 'stk-spelling-bee']
+    unlockedItemIds: Array.from(new Set([...STARTER_PACK_ITEM_IDS, ...INITIAL_HOME_ITEMS.filter((i) => i.unlocked).map((i) => i.id)])),
+    collectedStickerIds: ['stk-curious-sprout', 'stk-spelling-bee'],
+    character: {
+      x: 45,
+      y: 65,
+      facing: 'right',
+      animation: 'idle',
+      customization: DEFAULT_CHARACTER_CUSTOMIZATION
+    },
+    learningCoins: 350
   };
 };
 

@@ -17,10 +17,16 @@ import {
   HomeItem,
   HomeRoom,
   PlacedHomeItem,
-  AppSection
+  AppSection,
+  CharacterState,
+  FurnitureActionType,
+  ThemeId
 } from '../../types';
 import { INITIAL_HOME_ITEMS } from '../../data/learningHomeData';
+import { MiniatureFurnitureRenderer } from './MiniatureFurnitureRenderer';
+import { HomeCharacter } from './HomeCharacter';
 import { sound } from '../../utils/audio';
+import { getThemeConfig } from '../../data/themes';
 
 interface RoomCanvasProps {
   room: HomeRoom;
@@ -28,6 +34,9 @@ interface RoomCanvasProps {
   onRemoveItem: (instanceId: string) => void;
   onSelectSection: (section: AppSection) => void;
   isDecoratingMode: boolean;
+  character?: CharacterState;
+  onUpdateCharacter?: (c: CharacterState) => void;
+  themeId?: ThemeId;
 }
 
 export const RoomCanvas: React.FC<RoomCanvasProps> = ({
@@ -35,8 +44,12 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   onUpdatePlacedItems,
   onRemoveItem,
   onSelectSection,
-  isDecoratingMode
+  isDecoratingMode,
+  character,
+  onUpdateCharacter,
+  themeId
 }) => {
+  const activeTheme = getThemeConfig(themeId || (room.theme as ThemeId));
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [activePetDialogue, setActivePetDialogue] = useState<{ name: string; text: string } | null>(null);
   const [activeWordCard, setActiveWordCard] = useState<{ word: string; definition: string } | null>(null);
@@ -45,6 +58,13 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     description: string;
     targetSection: AppSection;
   } | null>(null);
+  const [activeFurnitureMenu, setActiveFurnitureMenu] = useState<{
+    instanceId: string;
+    item: HomeItem;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [characterBubble, setCharacterBubble] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -73,25 +93,26 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   // Handle pointer down on an item
   const handleItemPointerDown = (
     e: React.PointerEvent,
-    item: PlacedHomeItem,
+    placed: PlacedHomeItem,
     itemDef?: HomeItem
   ) => {
     e.stopPropagation();
 
-    // If in Explore mode (not Decorating mode), handle interactions instead of drag
+    // If in Play mode, handle interactions instead of drag
     if (!isDecoratingMode) {
-      handleItemInteraction(itemDef);
+      handleItemInteraction(placed, itemDef);
       return;
     }
 
     sound.playPop();
-    setSelectedInstanceId(item.instanceId);
+    setSelectedInstanceId(placed.instanceId);
+    setActiveFurnitureMenu(null);
     isDraggingRef.current = true;
 
     if (!canvasRef.current) return;
     const canvasRect = canvasRef.current.getBoundingClientRect();
-    const itemPixelX = (item.x / 100) * canvasRect.width;
-    const itemPixelY = (item.y / 100) * canvasRect.height;
+    const itemPixelX = (placed.x / 100) * canvasRect.width;
+    const itemPixelY = (placed.y / 100) * canvasRect.height;
 
     dragStartOffsetRef.current = {
       x: e.clientX - canvasRect.left - itemPixelX,
@@ -121,21 +142,259 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     onUpdatePlacedItems(updated);
   };
 
-  // Handle clicks on interactive items
-  const handleItemInteraction = (itemDef?: HomeItem) => {
+  // Walk character towards a location on click
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (isDecoratingMode) {
+      setSelectedInstanceId(null);
+      return;
+    }
+
+    setActiveFurnitureMenu(null);
+
+    if (!canvasRef.current || !character || !onUpdateCharacter) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const clickX = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+    const clickY = Math.max(45, Math.min(88, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+
+    const facing = clickX < character.x ? 'left' : 'right';
+
+    // Start walking animation
+    sound.playPop();
+    onUpdateCharacter({
+      ...character,
+      x: clickX,
+      y: clickY,
+      facing,
+      animation: 'walking'
+    });
+
+    // Settle to idle after brief walk
+    setTimeout(() => {
+      onUpdateCharacter({
+        ...character,
+        x: clickX,
+        y: clickY,
+        facing,
+        animation: 'idle'
+      });
+    }, 600);
+  };
+
+  // Determine contextual actions for any object in the room
+  const getItemActions = (itemDef: HomeItem): { action: FurnitureActionType; label: string; icon: string }[] => {
+    const id = itemDef.id.toLowerCase();
+    const name = itemDef.name.toLowerCase();
+
+    // 🐾 Animals: Cat (Luna)
+    if (id.includes('cat') || id.includes('luna') || name.includes('cat')) {
+      return [
+        { action: 'pet', label: 'Pet', icon: '🐾' },
+        { action: 'play', label: 'Play', icon: '🎾' },
+        { action: 'sleep', label: 'Sleep', icon: '😴' },
+        { action: 'stretch', label: 'Stretch', icon: '✨' },
+        { action: 'groom', label: 'Groom', icon: '🧼' }
+      ];
+    }
+
+    // 🐾 Animals: Dog (Sparky)
+    if (id.includes('pup') || id.includes('dog') || id.includes('sparky') || name.includes('pup') || name.includes('dog')) {
+      return [
+        { action: 'pet', label: 'Pet', icon: '🐾' },
+        { action: 'play', label: 'Play', icon: '🎾' },
+        { action: 'sit', label: 'Sit', icon: '🪑' },
+        { action: 'sleep', label: 'Sleep', icon: '😴' }
+      ];
+    }
+
+    // 🐾 Animals: Rabbit (Pippin)
+    if (id.includes('bunny') || id.includes('rabbit') || id.includes('pippin') || name.includes('bunny') || name.includes('rabbit')) {
+      return [
+        { action: 'pet', label: 'Pet', icon: '🐾' },
+        { action: 'feed', label: 'Feed', icon: '🥕' },
+        { action: 'hop', label: 'Hop', icon: '🐇' }
+      ];
+    }
+
+    // 🐾 Animals: Bird / Owl (Barnaby)
+    if (id.includes('owl') || id.includes('bird') || id.includes('barnaby') || name.includes('owl') || name.includes('bird')) {
+      return [
+        { action: 'talk', label: 'Talk', icon: '💬' },
+        { action: 'feed', label: 'Feed', icon: '🌾' },
+        { action: 'fly', label: 'Fly to perch', icon: '🪶' }
+      ];
+    }
+
+    // 🐾 Animals: Fox (Pip)
+    if (id.includes('fox') || name.includes('fox')) {
+      return [
+        { action: 'pet', label: 'Pet', icon: '🐾' },
+        { action: 'play', label: 'Play', icon: '🎾' },
+        { action: 'sleep', label: 'Sleep', icon: '😴' }
+      ];
+    }
+
+    // 🌿 Botanical Plants
+    if (
+      id.includes('plant') || id.includes('monstera') || id.includes('succulent') ||
+      id.includes('fern') || id.includes('flower') || id.includes('pothos') ||
+      id.includes('snake') || id.includes('lily') || name.includes('plant') ||
+      name.includes('monstera') || name.includes('succulent') || name.includes('fern')
+    ) {
+      return [
+        { action: 'waterPlant', label: 'Water', icon: '💧' },
+        { action: 'observePlant', label: 'Observe', icon: '🌱' }
+      ];
+    }
+
+    // 🛏️ Beds
+    if (id.includes('bed') || name.includes('bed')) {
+      return [
+        { action: 'sit', label: 'Sit', icon: '🪑' },
+        { action: 'sleep', label: 'Sleep', icon: '😴' },
+        { action: 'messBed', label: 'Mess Up Bed', icon: '🤪' },
+        { action: 'makeBed', label: 'Make Bed', icon: '✨' }
+      ];
+    }
+
+    // 🛋️ Chairs & Sofas
+    if (id.includes('chair') || id.includes('sofa') || id.includes('cushion') || id.includes('armchair') || name.includes('chair') || name.includes('sofa')) {
+      return [
+        { action: 'sit', label: 'Sit', icon: '🪑' },
+        { action: 'sit', label: 'Relax', icon: '☕' }
+      ];
+    }
+
+    // 📚 Bookshelves & Desks
+    if (id.includes('book') || id.includes('shelf') || id.includes('desk') || name.includes('book') || name.includes('shelf') || name.includes('desk')) {
+      return [
+        { action: 'browseBooks', label: 'Browse Books', icon: '📚' },
+        { action: 'read', label: 'Read', icon: '📖' }
+      ];
+    }
+
+    // 💡 Lighting
+    if (id.includes('lamp') || id.includes('candle') || id.includes('lantern') || id.includes('light') || name.includes('lamp') || name.includes('light')) {
+      return [
+        { action: 'turnOn', label: 'Turn On', icon: '💡' },
+        { action: 'turnOff', label: 'Turn Off', icon: '🌙' }
+      ];
+    }
+
+    // 🪟 Windows
+    if (id.includes('window') || name.includes('window')) {
+      return [
+        { action: 'openWindow', label: 'Open Window', icon: '🌤️' },
+        { action: 'closeWindow', label: 'Close Window', icon: '🪟' }
+      ];
+    }
+
+    // 🚪 Doors
+    if (id.includes('door') || name.includes('door')) {
+      return [
+        { action: 'openDoor', label: 'Open Door', icon: '🚪' },
+        { action: 'closeDoor', label: 'Close Door', icon: '🔒' }
+      ];
+    }
+
+    if (itemDef.actions && itemDef.actions.length > 0) {
+      return itemDef.actions.map(act => ({ action: act, label: act, icon: '✨' }));
+    }
+
+    return [{ action: 'sit', label: 'Sit', icon: '🪑' }];
+  };
+
+  // Periodic subtle idle movements and pose adjustments for animals
+  useEffect(() => {
+    if (isDecoratingMode) return;
+
+    const interval = setInterval(() => {
+      const animalItems = room.placedItems
+        .map((p, index) => ({ p, index, def: itemMap.current.get(p.itemId) }))
+        .filter(({ def }) => {
+          if (!def) return false;
+          const id = def.id.toLowerCase();
+          const name = def.name.toLowerCase();
+          return (
+            def.category === 'companion' ||
+            id.startsWith('pet-') ||
+            id.includes('cat') ||
+            id.includes('dog') ||
+            id.includes('pup') ||
+            id.includes('bunny') ||
+            id.includes('owl') ||
+            id.includes('fox') ||
+            name.includes('cat') ||
+            name.includes('dog') ||
+            name.includes('bunny') ||
+            name.includes('owl') ||
+            name.includes('fox')
+          );
+        });
+
+      if (animalItems.length === 0) return;
+
+      const randomChoice = animalItems[Math.floor(Math.random() * animalItems.length)];
+      const idleAnimations = ['idle', 'stretch', 'play', 'idle', 'hop'];
+      const nextAnimation = idleAnimations[Math.floor(Math.random() * idleAnimations.length)];
+
+      const deltaX = (Math.random() - 0.5) * 4;
+      const newX = Math.max(15, Math.min(85, Math.round(randomChoice.p.x + deltaX)));
+
+      const updated = room.placedItems.map((item, idx) => {
+        if (idx === randomChoice.index) {
+          return { ...item, x: newX, state: nextAnimation };
+        }
+        return item;
+      });
+
+      onUpdatePlacedItems(updated);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((item, idx) => {
+          if (idx === randomChoice.index && item.state === nextAnimation) {
+            return { ...item, state: 'idle' };
+          }
+          return item;
+        });
+        onUpdatePlacedItems(reset);
+      }, 3500);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isDecoratingMode, room.placedItems, onUpdatePlacedItems]);
+
+  // Handle clicks on items in Play Mode
+  const handleItemInteraction = (placed: PlacedHomeItem, itemDef?: HomeItem) => {
     if (!itemDef) return;
 
     sound.playPop();
 
-    if (itemDef.interactiveType === 'companion_pet' && itemDef.interactiveData?.petDialogue) {
-      sound.playSuccessChime();
-      setActivePetDialogue({
-        name: itemDef.interactiveData.petName || itemDef.name,
-        text: itemDef.interactiveData.petDialogue
+    // Move character toward item
+    if (character && onUpdateCharacter) {
+      const facing = placed.x < character.x ? 'left' : 'right';
+      const targetCharX = Math.max(10, Math.min(90, placed.x + (facing === 'left' ? 12 : -12)));
+      const targetCharY = Math.max(50, Math.min(85, placed.y));
+
+      onUpdateCharacter({
+        ...character,
+        x: targetCharX,
+        y: targetCharY,
+        facing: placed.x < targetCharX ? 'left' : 'right',
+        animation: 'walking'
       });
-      return;
+
+      setTimeout(() => {
+        onUpdateCharacter({
+          ...character,
+          x: targetCharX,
+          y: targetCharY,
+          facing: placed.x < targetCharX ? 'left' : 'right',
+          animation: 'idle'
+        });
+      }, 400);
     }
 
+    // Special item logic: Knowledge flower
     if (itemDef.interactiveType === 'knowledge_flower' && itemDef.interactiveData?.word) {
       setActiveWordCard({
         word: itemDef.interactiveData.word,
@@ -144,13 +403,282 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       return;
     }
 
+    // Special item logic: Station
     if (itemDef.interactiveData?.targetSection) {
       setInteractiveStation({
         title: itemDef.interactiveData.title || itemDef.name,
         description: itemDef.interactiveData.description || 'Open this interactive learning station.',
         targetSection: itemDef.interactiveData.targetSection
       });
+      return;
     }
+
+    // Display contextual interaction menu directly for animals, plants, furniture, etc.
+    setActiveFurnitureMenu({
+      instanceId: placed.instanceId,
+      item: itemDef,
+      x: placed.x,
+      y: placed.y
+    });
+  };
+
+  // Perform furniture/animal/plant specific action
+  const handlePerformAction = (action: FurnitureActionType, instanceId: string) => {
+    sound.playPop();
+    const placed = room.placedItems.find((p) => p.instanceId === instanceId);
+    if (!placed) return;
+    const itemDef = itemMap.current.get(placed.itemId);
+    const itemName = itemDef?.name || 'Cozy Item';
+
+    // 1. PET
+    if (action === 'pet') {
+      sound.playSuccessChime();
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'pet' } : p
+      );
+      onUpdatePlacedItems(updated);
+
+      const petDialogue = itemDef?.interactiveData?.petDialogue;
+      const petName = itemDef?.interactiveData?.petName || itemName;
+      setCharacterBubble(petDialogue ? `${petName}: "${petDialogue}"` : `${petName} purrs happily! 🐾`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3500);
+    }
+    // 2. PLAY
+    else if (action === 'play') {
+      sound.playSuccessChime();
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'play' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`Playing games together with ${itemName}! 🎾`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3000);
+    }
+    // 3. SLEEP
+    else if (action === 'sleep') {
+      sound.playSuccessChime();
+      const isAnimal = itemDef?.category === 'companion' || itemDef?.id.includes('pet');
+      if (isAnimal) {
+        const updated = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'sleep' } : p
+        );
+        onUpdatePlacedItems(updated);
+        setCharacterBubble(`${itemName} curled up for a peaceful nap! 💤`);
+
+        setTimeout(() => {
+          const reset = room.placedItems.map((p) =>
+            p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+          );
+          onUpdatePlacedItems(reset);
+          setCharacterBubble(null);
+        }, 4000);
+      } else {
+        if (character && onUpdateCharacter) {
+          onUpdateCharacter({ ...character, animation: 'sleeping' });
+          setCharacterBubble('Nap time in the cozy bed! 💤');
+          setTimeout(() => setCharacterBubble(null), 3500);
+        }
+      }
+    }
+    // 4. STRETCH
+    else if (action === 'stretch') {
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'stretch' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`${itemName} does a big, cozy stretch! 🐾`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3000);
+    }
+    // 5. GROOM
+    else if (action === 'groom') {
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'groom' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`${itemName} washes fluffy paws and fur! ✨`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3000);
+    }
+    // 6. FEED
+    else if (action === 'feed') {
+      sound.playSuccessChime();
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'feed' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`Crunch crunch! Healthy treat for ${itemName}! 🥕`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3000);
+    }
+    // 7. HOP
+    else if (action === 'hop') {
+      sound.playPop();
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'hop' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`Boing boing! Happy hop! 🐇`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 2500);
+    }
+    // 8. TALK
+    else if (action === 'talk') {
+      sound.playSuccessChime();
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'talk' } : p
+      );
+      onUpdatePlacedItems(updated);
+      const dialogue = itemDef?.interactiveData?.petDialogue || 'Hoo-hoo! Did you know words are seeds of wisdom?';
+      setCharacterBubble(`${itemName}: "${dialogue}" 🦉`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 4000);
+    }
+    // 9. FLY TO PERCH
+    else if (action === 'fly') {
+      sound.playPop();
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'fly' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`${itemName} flutters up gracefully to perch! 🪶`);
+
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3000);
+    }
+    // 10. WATER PLANT
+    else if (action === 'waterPlant') {
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'watered' } : p
+      );
+      onUpdatePlacedItems(updated);
+
+      if (character && onUpdateCharacter) {
+        onUpdateCharacter({ ...character, animation: 'watering' });
+        setCharacterBubble(`Watered ${itemName} with love! 💧`);
+        setTimeout(() => {
+          onUpdateCharacter({ ...character, animation: 'idle' });
+          setCharacterBubble(null);
+        }, 3000);
+      }
+    }
+    // 11. OBSERVE PLANT
+    else if (action === 'observePlant') {
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'observed' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(`Observing ${itemName}: Vibrant and thriving! 🌱`);
+      setTimeout(() => {
+        const reset = room.placedItems.map((p) =>
+          p.instanceId === instanceId ? { ...p, state: 'idle' } : p
+        );
+        onUpdatePlacedItems(reset);
+        setCharacterBubble(null);
+      }, 3000);
+    }
+    // 12. SIT
+    else if (action === 'sit') {
+      if (character && onUpdateCharacter) {
+        onUpdateCharacter({ ...character, animation: 'sitting' });
+        setCharacterBubble(`So comfortable and cozy on ${itemName}! 🪑`);
+        setTimeout(() => setCharacterBubble(null), 2500);
+      }
+    }
+    // 13. READ / BROWSE BOOKS
+    else if (action === 'read' || action === 'browseBooks') {
+      if (character && onUpdateCharacter) {
+        onUpdateCharacter({ ...character, animation: 'reading' });
+        setCharacterBubble('Reading a lovely chapter! 📖');
+        setTimeout(() => setCharacterBubble(null), 3000);
+      }
+    }
+    // 14. BED TIDY / MESSY
+    else if (action === 'messBed') {
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'messy' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble('Playful messy daybed mode! 🤪');
+      setTimeout(() => setCharacterBubble(null), 2500);
+    } else if (action === 'makeBed') {
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: 'neat' } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble('All tidy and neatly made! ✨');
+      setTimeout(() => setCharacterBubble(null), 2500);
+    }
+    // 15. LIGHTS
+    else if (action === 'turnOn' || action === 'turnOff') {
+      const nextState = placed.state === 'turned_off' ? 'turned_on' : 'turned_off';
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: nextState } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(nextState === 'turned_on' ? 'Warm light shining bright! 💡' : 'Night light dimmed 🌙');
+      setTimeout(() => setCharacterBubble(null), 2500);
+    }
+    // 16. WINDOWS & DOORS
+    else if (action === 'openDoor' || action === 'closeDoor' || action === 'openWindow' || action === 'closeWindow') {
+      const nextState = placed.state === 'open' ? 'closed' : 'open';
+      const updated = room.placedItems.map((p) =>
+        p.instanceId === instanceId ? { ...p, state: nextState } : p
+      );
+      onUpdatePlacedItems(updated);
+      setCharacterBubble(nextState === 'open' ? 'Fresh gentle air! 🌤️' : 'Snug and cozy! 🏡');
+      setTimeout(() => setCharacterBubble(null), 2500);
+    }
+
+    setActiveFurnitureMenu(null);
   };
 
   // Rotate item by 90 degrees
@@ -173,7 +701,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     sound.playPop();
     const updated = room.placedItems.map((p) => {
       if (p.instanceId === selectedInstanceId) {
-        const nextScale = Math.max(0.7, Math.min(1.8, parseFloat((p.scale + delta).toFixed(2))));
+        const nextScale = Math.max(0.6, Math.min(2.0, parseFloat((p.scale + delta).toFixed(2))));
         return { ...p, scale: nextScale };
       }
       return p;
@@ -181,11 +709,11 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     onUpdatePlacedItems(updated);
   };
 
-  // Bring item forward (increase z-index)
+  // Bring item forward in z-index
   const handleBringForward = () => {
     if (!selectedInstanceId) return;
     sound.playPop();
-    const maxZ = Math.max(...room.placedItems.map((p) => p.zIndex || 1), 1);
+    const maxZ = Math.max(10, ...room.placedItems.map((p) => p.zIndex || 10));
     const updated = room.placedItems.map((p) => {
       if (p.instanceId === selectedInstanceId) {
         return { ...p, zIndex: maxZ + 1 };
@@ -195,6 +723,15 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     onUpdatePlacedItems(updated);
   };
 
+  // Check if any lamp is turned on to add warm lighting glow
+  const hasActiveLamp = room.placedItems.some((p) => {
+    const def = itemMap.current.get(p.itemId);
+    return (
+      (def?.shopCategory === 'lighting' || def?.id.includes('lamp')) &&
+      p.state !== 'turned_off'
+    );
+  });
+
   return (
     <div className="relative w-full select-none">
       {/* 🏡 3D Perspective Room Stage */}
@@ -202,45 +739,124 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
         ref={canvasRef}
         id="learning-home-canvas"
         onPointerMove={handleCanvasPointerMove}
-        onClick={() => {
-          if (isDecoratingMode) {
-            setSelectedInstanceId(null);
-          }
-        }}
-        className={`relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[580px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/60 transition-all ${room.wallpaperClass}`}
+        onClick={handleCanvasClick}
+        className={`relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[580px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/80 transition-all ${room.wallpaperClass}`}
         style={{
           perspective: '1000px',
           touchAction: 'none'
         }}
       >
-        {/* Architectural Room Perspective: Ceiling Molding */}
-        <div className="absolute top-0 inset-x-0 h-8 sm:h-12 bg-gradient-to-b from-white/30 to-transparent pointer-events-none border-b border-white/20 z-1" />
+        {/* Architectural Ceiling Molding */}
+        <div className="absolute top-0 inset-x-0 h-8 sm:h-12 bg-gradient-to-b from-white/40 to-transparent pointer-events-none border-b border-white/20 z-1" />
 
-        {/* Room Window with Daylight / Starlight Accent */}
-        <div className="absolute top-8 right-12 sm:right-20 w-24 sm:w-36 h-28 sm:h-40 rounded-t-full border-4 border-white/70 bg-gradient-to-b from-sky-200/50 via-cyan-100/30 to-amber-100/20 shadow-inner backdrop-blur-xs flex items-center justify-center pointer-events-none z-1">
-          {/* Window Panes Grid */}
+        {/* Ambient Room Lighting Glow when lamps are active or theme-based atmospheric lighting */}
+        {hasActiveLamp && (
+          <div className="absolute inset-0 bg-amber-300/15 pointer-events-none mix-blend-soft-light z-2 animate-pulse duration-3000" />
+        )}
+        {activeTheme.home?.lighting === 'sunset' && (
+          <div className="absolute inset-0 bg-gradient-to-b from-orange-400/10 via-amber-300/10 to-rose-400/10 pointer-events-none mix-blend-soft-light z-2" />
+        )}
+        {activeTheme.home?.lighting === 'neon' && (
+          <div className="absolute inset-0 bg-gradient-to-b from-fuchsia-600/10 via-purple-500/10 to-indigo-600/10 pointer-events-none mix-blend-screen z-2" />
+        )}
+        {activeTheme.home?.lighting === 'cool_futuristic' && (
+          <div className="absolute inset-0 bg-gradient-to-b from-cyan-400/10 via-blue-500/10 to-transparent pointer-events-none mix-blend-screen z-2" />
+        )}
+        {activeTheme.home?.lighting === 'candlelight' && (
+          <div className="absolute inset-0 bg-amber-600/15 pointer-events-none mix-blend-soft-light z-2" />
+        )}
+
+        {/* Room Window with Theme-Specific Scenery (Stars, Ocean, Forest, Mountains, Garden, etc.) */}
+        <div className="absolute top-8 right-10 sm:right-16 w-24 sm:w-36 h-28 sm:h-40 rounded-t-full border-4 border-white/85 shadow-inner backdrop-blur-xs flex items-center justify-center pointer-events-none z-1 overflow-hidden">
+          {activeTheme.home?.windowView === 'stars' ? (
+            <div className="w-full h-full bg-gradient-to-b from-slate-950 via-indigo-950 to-purple-950 flex flex-col items-center justify-center relative">
+              <span className="text-xl sm:text-2xl animate-pulse">🪐</span>
+              <div className="absolute top-2 left-3 text-[10px] text-amber-200">✨</div>
+              <div className="absolute bottom-4 right-3 text-[10px] text-cyan-200">⭐</div>
+              <div className="absolute top-6 right-4 text-[9px] text-white">✨</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'ocean' ? (
+            <div className="w-full h-full bg-gradient-to-b from-sky-400 via-cyan-300 to-teal-300 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">⛵</span>
+              <div className="absolute bottom-1 inset-x-0 text-center text-xs opacity-70">🌊🌊</div>
+              <div className="absolute top-2 right-2 text-xs">☀️</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'forest' ? (
+            <div className="w-full h-full bg-gradient-to-b from-emerald-300 via-green-400 to-lime-200 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">🌲</span>
+              <div className="absolute top-2 right-3 text-xs">🦅</div>
+              <div className="absolute bottom-1 left-2 text-xs">🍃</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'mountains' ? (
+            <div className="w-full h-full bg-gradient-to-b from-sky-400 via-slate-200 to-indigo-100 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">🏔️</span>
+              <div className="absolute top-3 left-3 text-xs">🦅</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'arcade' ? (
+            <div className="w-full h-full bg-gradient-to-b from-fuchsia-950 via-purple-950 to-indigo-950 flex flex-col items-center justify-center relative">
+              <span className="text-xl sm:text-2xl animate-bounce">👾</span>
+              <div className="absolute bottom-1 inset-x-0 text-center text-[10px] text-pink-400 font-mono">===</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'stadium' ? (
+            <div className="w-full h-full bg-gradient-to-b from-sky-400 via-emerald-300 to-green-600 flex flex-col items-center justify-center relative">
+              <span className="text-xl sm:text-2xl">🏟️</span>
+              <div className="absolute bottom-2 right-3 text-xs">⚽</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'lab' ? (
+            <div className="w-full h-full bg-gradient-to-b from-slate-900 via-cyan-950 to-slate-800 flex flex-col items-center justify-center relative">
+              <span className="text-xl sm:text-2xl animate-spin text-cyan-300">⚛️</span>
+              <div className="absolute top-2 right-2 text-xs">🔬</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'studio' ? (
+            <div className="w-full h-full bg-gradient-to-b from-rose-200 via-amber-200 to-orange-300 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">🎨</span>
+              <div className="absolute top-2 right-2 text-xs">🌤️</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'peaceful_terrace' ? (
+            <div className="w-full h-full bg-gradient-to-b from-amber-100 via-orange-100 to-stone-200 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">🕊️</span>
+              <div className="absolute bottom-1 text-xs">🌿</div>
+              <div className="absolute top-2 right-2 text-xs">☀️</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'city' ? (
+            <div className="w-full h-full bg-gradient-to-b from-sky-300 via-amber-100 to-stone-200 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">🏙️</span>
+              <div className="absolute top-2 right-2 text-xs">🌤️</div>
+            </div>
+          ) : activeTheme.home?.windowView === 'garden' ? (
+            <div className="w-full h-full bg-gradient-to-b from-rose-100 via-pink-100 to-amber-100 flex flex-col items-center justify-center relative">
+              <span className="text-2xl sm:text-3xl">🌸</span>
+              <div className="absolute top-2 right-2 text-xs">🦋</div>
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-b from-sky-200/50 via-cyan-100/30 to-amber-100/20 flex items-center justify-center relative">
+              <span className="text-2xl sm:text-4xl opacity-70 select-none">☀️</span>
+            </div>
+          )}
+          {/* Window Frame Panes */}
           <div className="w-full h-0.5 bg-white/70 absolute top-1/2" />
           <div className="h-full w-0.5 bg-white/70 absolute left-1/2" />
-          <span className="text-2xl sm:text-4xl opacity-50 select-none">☀️</span>
         </div>
 
-        {/* Left Perspective Wall Angle */}
+        {/* Left & Right Corner Shadow Depths */}
         <div className="absolute inset-y-0 left-0 w-8 sm:w-16 bg-gradient-to-r from-black/10 to-transparent pointer-events-none z-2" />
-        {/* Right Perspective Wall Angle */}
         <div className="absolute inset-y-0 right-0 w-8 sm:w-16 bg-gradient-to-l from-black/10 to-transparent pointer-events-none z-2" />
 
-        {/* Realistic Wooden or Tiled Flooring Area (Bottom 40%) */}
+        {/* Realistic Perspective Flooring Area (Bottom 42%) */}
         <div
           className={`absolute bottom-0 inset-x-0 h-[42%] pointer-events-none z-2 ${room.flooringClass}`}
           style={{
             transformStyle: 'preserve-3d',
-            transform: 'perspective(400px) rotateX(20deg)',
+            transform: 'perspective(400px) rotateX(18deg)',
             transformOrigin: 'bottom'
           }}
         >
-          {/* Subtle floor plank lines */}
+          {/* Subtle wood plank lines texture */}
           <div className="w-full h-full opacity-15 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
         </div>
+
+        {/* Baseboard Wall Divider */}
+        <div className="absolute bottom-[42%] inset-x-0 h-2 bg-gradient-to-b from-black/10 to-white/40 pointer-events-none z-2" />
 
         {/* Placed Items Render Loop */}
         {room.placedItems.map((placed) => {
@@ -249,7 +865,6 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
           const isSelected = placed.instanceId === selectedInstanceId && isDecoratingMode;
           const isSticker = itemDef.category === 'sticker';
-          const isCompanion = itemDef.category === 'companion';
 
           return (
             <div
@@ -258,8 +873,10 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
               onPointerDown={(e) => handleItemPointerDown(e, placed, itemDef)}
               className={`absolute cursor-pointer transition-transform ${
                 isSelected
-                  ? 'ring-4 ring-pink-500/80 ring-offset-2 ring-offset-white/80 rounded-2xl shadow-xl'
-                  : 'hover:scale-105'
+                  ? 'ring-4 ring-amber-500 ring-offset-2 ring-offset-white/80 rounded-2xl shadow-2xl'
+                  : isDecoratingMode
+                  ? 'hover:scale-105 hover:ring-2 hover:ring-amber-300 rounded-xl'
+                  : 'hover:scale-103'
               } flex flex-col items-center justify-center touch-none`}
               style={{
                 left: `${placed.x}%`,
@@ -268,23 +885,26 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
                 zIndex: isSelected ? 99 : placed.zIndex || 10
               }}
             >
-              {/* Item Visual Rendering */}
+              {/* Item Visual Rendering using MiniatureFurnitureRenderer */}
               <div className="relative group">
-                <span
-                  className={`block transition-all select-none ${
-                    isSticker
-                      ? 'text-4xl sm:text-6xl drop-shadow-md'
-                      : isCompanion
-                      ? 'text-5xl sm:text-7xl drop-shadow-lg animate-bounce duration-1000'
-                      : 'text-5xl sm:text-7xl drop-shadow-lg'
-                  }`}
-                >
-                  {itemDef.icon}
-                </span>
+                {isSticker ? (
+                  <span className="block text-4xl sm:text-6xl drop-shadow-md select-none">
+                    {itemDef.icon}
+                  </span>
+                ) : (
+                  <div className="select-none pointer-events-none">
+                    <MiniatureFurnitureRenderer
+                      item={itemDef}
+                      state={placed.state}
+                      isLit={placed.state !== 'turned_off'}
+                      size="md"
+                    />
+                  </div>
+                )}
 
-                {/* Subtle hover label in explore mode */}
+                {/* Play mode subtle hover tag */}
                 {!isDecoratingMode && (
-                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white/95 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white/95 text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs border border-stone-200 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
                     {itemDef.name}
                   </div>
                 )}
@@ -293,10 +913,71 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           );
         })}
 
-        {/* Floating Decorating Tool Bar for Selected Item */}
+        {/* 👤 Live Customizable Miniature Character */}
+        {character && (
+          <div
+            id="home-mini-character"
+            className="absolute transition-all duration-500 ease-out z-30"
+            style={{
+              left: `${character.x}%`,
+              top: `${character.y}%`,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            <HomeCharacter
+              state={character}
+              bubbleMessage={characterBubble}
+              onClick={() => {
+                sound.playPop();
+                setCharacterBubble('Hi there! Let’s keep learning! 🌟');
+                setTimeout(() => setCharacterBubble(null), 2500);
+              }}
+            />
+          </div>
+        )}
+
+        {/* 🎮 Contextual Furniture Action Pill Menu (Play Mode) */}
+        {activeFurnitureMenu && !isDecoratingMode && (
+          <div
+            className="absolute z-50 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-300 p-2.5 flex flex-col gap-1.5 transition-all -translate-x-1/2 animate-in fade-in zoom-in-95 min-w-36"
+            style={{
+              left: `${activeFurnitureMenu.x}%`,
+              top: `${Math.max(10, activeFurnitureMenu.y - 24)}%`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-stone-100 pb-1 px-1">
+              <span className="text-[11px] font-bold text-amber-950 truncate max-w-[120px]">
+                {activeFurnitureMenu.item.name}
+              </span>
+              <button
+                onClick={() => setActiveFurnitureMenu(null)}
+                className="text-stone-400 hover:text-stone-700"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-1.5 pt-1">
+              {getItemActions(activeFurnitureMenu.item).map((actObj) => (
+                <button
+                  key={actObj.action + actObj.label}
+                  onClick={() => handlePerformAction(actObj.action, activeFurnitureMenu.instanceId)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 font-extrabold text-xs transition-colors cursor-pointer text-left shadow-2xs active:scale-95 min-h-[38px]"
+                >
+                  <span className="text-base">{actObj.icon}</span>
+                  <span className="truncate">{actObj.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 🛠️ Floating Decorating Tool Bar for Selected Item */}
         {selectedPlacedItem && selectedItemDef && isDecoratingMode && (
           <div
-            className="absolute z-50 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-pink-300 p-2 flex items-center gap-1.5 transition-all -translate-x-1/2"
+            className="absolute z-50 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-300 p-2 flex items-center gap-1.5 transition-all -translate-x-1/2"
             style={{
               left: `${selectedPlacedItem.x}%`,
               top: `${Math.max(8, selectedPlacedItem.y - 18)}%`
@@ -306,7 +987,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
             {/* Rotate */}
             <button
               onClick={handleRotate}
-              className="p-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 cursor-pointer transition-transform active:scale-90"
+              className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-transform active:scale-90"
               title="Rotate 90°"
             >
               <RotateCw className="w-4 h-4" />
@@ -315,7 +996,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
             {/* Scale Down */}
             <button
               onClick={() => handleScaleChange(-0.1)}
-              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 cursor-pointer transition-transform active:scale-90"
+              className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-700 cursor-pointer transition-transform active:scale-90"
               title="Make Smaller"
             >
               <Minimize2 className="w-4 h-4" />
@@ -324,7 +1005,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
             {/* Scale Up */}
             <button
               onClick={() => handleScaleChange(0.1)}
-              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 cursor-pointer transition-transform active:scale-90"
+              className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-700 cursor-pointer transition-transform active:scale-90"
               title="Make Larger"
             >
               <Maximize2 className="w-4 h-4" />
@@ -355,7 +1036,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
             {/* Deselect */}
             <button
               onClick={() => setSelectedInstanceId(null)}
-              className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 cursor-pointer"
+              className="p-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer"
               title="Done"
             >
               <Check className="w-4 h-4 text-emerald-600" />
@@ -365,13 +1046,13 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
         {/* Empty Room Hint */}
         {room.placedItems.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-slate-400">
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-stone-400">
             <span className="text-5xl mb-2 animate-pulse">🏡</span>
-            <p className="font-extrabold text-sm sm:text-base font-['Fredoka'] text-slate-600">
+            <p className="font-extrabold text-sm sm:text-base text-stone-700">
               Your room is ready for decorating!
             </p>
-            <p className="text-xs text-slate-500">
-              Tap "🎒 My Collection" below to place furniture, stickers, and cozy companions.
+            <p className="text-xs text-stone-500">
+              Tap "🛍️ Shop" or "🎒 Inventory" below to place cozy miniature furniture.
             </p>
           </div>
         )}
@@ -382,12 +1063,12 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       {/* 🐾 Pet Dialogue Speech Bubble */}
       {activePetDialogue && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full border-4 border-pink-200 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full border-4 border-amber-200 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
             <span className="text-5xl block animate-bounce">🐾</span>
-            <h4 className="text-xl font-extrabold text-slate-800 font-['Fredoka']">
+            <h4 className="text-xl font-extrabold text-stone-900">
               {activePetDialogue.name} says:
             </h4>
-            <div className="p-4 rounded-2xl bg-pink-50 text-pink-900 font-semibold text-sm leading-relaxed border border-pink-100">
+            <div className="p-4 rounded-2xl bg-amber-50 text-amber-950 font-semibold text-sm leading-relaxed border border-amber-100">
               "{activePetDialogue.text}"
             </div>
             <button
@@ -395,7 +1076,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
                 sound.playPop();
                 setActivePetDialogue(null);
               }}
-              className="w-full py-3 rounded-full bg-pink-500 hover:bg-pink-600 text-white font-extrabold text-sm cursor-pointer shadow-md transition-all active:scale-95"
+              className="w-full py-3 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm cursor-pointer shadow-md transition-all active:scale-95"
             >
               Thanks, {activePetDialogue.name}! 🌸
             </button>
@@ -411,7 +1092,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
               <span className="text-4xl">🌺</span>
               <button
                 onClick={() => setActiveWordCard(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 rounded-full text-stone-400 hover:text-stone-600 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -420,17 +1101,17 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
               <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block">
                 Mastered Knowledge Flower
               </span>
-              <h4 className="text-2xl font-extrabold text-slate-900 font-['Fredoka']">
+              <h4 className="text-2xl font-extrabold text-stone-900">
                 {activeWordCard.word}
               </h4>
             </div>
-            <p className="text-sm text-slate-600 font-medium leading-relaxed bg-emerald-50/70 p-4 rounded-2xl border border-emerald-100">
+            <p className="text-sm text-stone-600 font-medium leading-relaxed bg-emerald-50/70 p-4 rounded-2xl border border-emerald-100">
               "{activeWordCard.definition}"
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => sound.speak(activeWordCard.word)}
-                className="flex-1 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+                className="flex-1 py-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
               >
                 <Volume2 className="w-4 h-4" />
                 <span>Hear Word</span>
@@ -454,23 +1135,23 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
               <span className="text-4xl">✨</span>
               <button
                 onClick={() => setInteractiveStation(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 rounded-full text-stone-400 hover:text-stone-600 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div>
-              <h4 className="text-xl font-extrabold text-slate-900 font-['Fredoka']">
+              <h4 className="text-xl font-extrabold text-stone-900">
                 {interactiveStation.title}
               </h4>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-stone-500 mt-1">
                 {interactiveStation.description}
               </p>
             </div>
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setInteractiveStation(null)}
-                className="flex-1 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs cursor-pointer"
+                className="flex-1 py-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold text-xs cursor-pointer"
               >
                 Stay in Home
               </button>

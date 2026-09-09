@@ -1,7 +1,9 @@
 import { HomeItem, HomeRoom, HomeRoomId, StickerItem, UserLearningHomeState, UserProfile, VocabWord } from '../types';
+import { SHOP_CATALOG_ITEMS } from './homeShopCatalog';
 
 export const INITIAL_HOME_ITEMS: HomeItem[] = [
-  // --- STARTER FURNITURE & BASICS ---
+  ...SHOP_CATALOG_ITEMS,
+  // --- LEGACY STARTER FURNITURE & BASICS ---
   {
     id: 'furn-starter-bed',
     name: 'Cozy Cloud Daybed',

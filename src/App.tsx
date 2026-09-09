@@ -65,6 +65,9 @@ import { FlashcardCenter } from './components/FlashcardCenter';
 import { TrueSpellingTest } from './components/TrueSpellingTest';
 import { DiscoverLearningPath } from './components/DiscoverLearningPath';
 import { LearningHome } from './components/LearningHome';
+import { LearnSection } from './components/LearnSection';
+import { PracticeSection } from './components/PracticeSection';
+import { TestSection } from './components/TestSection';
 import { StartingAssessmentResult } from './types';
 
 // Firebase & Cloud Accounts Integration
@@ -105,7 +108,7 @@ function MainAppContent() {
   const [books, setBooks] = useState<BookRecord[]>(loadBooks);
 
   // Active view navigation
-  const [activeSection, setActiveSection] = useState<AppSection>('home');
+  const [activeSection, setActiveSection] = useState<AppSection>('learn');
 
   // Modals & Screen States
   const [showWelcomeBack, setShowWelcomeBack] = useState<boolean>(() => {
@@ -250,13 +253,26 @@ function MainAppContent() {
     timesPracticed: 3
   };
 
-  // Profile XP Handlers
+  // Profile XP & LearningCoins Handlers
   const handleAddXp = (amount: number) => {
     const newXp = activeProfile.xp + amount;
     const newLevel = Math.floor(newXp / 100) + 1;
+    // Earn 1 LearningCoin per 2 XP (minimum 1 coin) for educational achievements!
+    const coinsEarned = Math.max(1, Math.round(amount * 0.5));
+    const currentCoins = typeof activeProfile.learningCoins === 'number' ? activeProfile.learningCoins : 350;
+    const newCoins = currentCoins + coinsEarned;
     updateActiveProfile({
       xp: newXp,
-      level: newLevel
+      level: newLevel,
+      learningCoins: newCoins
+    });
+  };
+
+  const handleAddCoins = (amount: number) => {
+    const currentCoins = typeof activeProfile.learningCoins === 'number' ? activeProfile.learningCoins : 350;
+    const newCoins = currentCoins + amount;
+    updateActiveProfile({
+      learningCoins: newCoins
     });
   };
 
@@ -631,7 +647,7 @@ function MainAppContent() {
             words={words}
             onContinue={() => {
               setShowWelcomeBack(false);
-              setActiveSection('home');
+              setActiveSection('learn');
             }}
             onSwitchProfile={() => {
               setShowWelcomeBack(false);
@@ -646,12 +662,12 @@ function MainAppContent() {
             onSelectProfile={async (id) => {
               await switchProfile(id);
               setShowProfileSwitcher(false);
-              setActiveSection('home');
+              setActiveSection('learn');
             }}
             onAddNewProfile={async (data) => {
               await createProfile(data);
               setShowProfileSwitcher(false);
-              setActiveSection('home');
+              setActiveSection('learn');
             }}
             onOpenParentArea={() => {
               setShowProfileSwitcher(false);
@@ -660,19 +676,68 @@ function MainAppContent() {
           />
         ) : (
           <>
-            {activeSection === 'home' && (
-              <HomeDashboard
+            {/* 1. LEARN (Primary Educational Core) */}
+            {(activeSection === 'learn' || activeSection === 'home') && (
+              <LearnSection
                 profile={activeProfile}
                 vocabWords={words}
                 bibleWords={bibleWords}
-                gardenPlots={gardenPlots}
-                badges={badges}
                 onSelectSection={handleNavigateSection}
-                onWaterPlot={handleWaterPlot}
+                onUpdateWordScore={handleUpdateWordScore}
+                onAddNewWord={handleAddNewWord}
                 onAddXp={handleAddXp}
-                onOpenThemes={() => setShowThemeModal(true)}
                 onOpenHomework={() => setShowHomeworkModal(true)}
-                onUpdateGoals={handleUpdateDailyGoals}
+                onOpenThemes={() => setShowThemeModal(true)}
+              />
+            )}
+
+            {/* 2. READ (15-Min Reading Companion & Word Discovery) */}
+            {(activeSection === 'read' || activeSection === 'reading_adventure') && (
+              <ReadingAdventure
+                profile={activeProfile}
+                allWords={words}
+                readingSessions={readingSessions}
+                books={books}
+                onAddNewWord={handleAddNewWord}
+                onSessionComplete={handleReadingSessionComplete}
+                onAddXp={handleAddXp}
+                onBackToHome={() => setActiveSection('learn')}
+              />
+            )}
+
+            {/* 3. PRACTICE (Focused Modes: Flashcards, Spelling, Pronunciation, Challenges, Quiz) */}
+            {activeSection === 'practice' && (
+              <PracticeSection
+                words={words}
+                profile={activeProfile}
+                onSelectSection={handleNavigateSection}
+                onUpdateWordScore={handleUpdateWordScore}
+                onAddXp={handleAddXp}
+                onOpenHomework={() => setShowHomeworkModal(true)}
+              />
+            )}
+
+            {/* 4. TEST (Weekly Assessment, Baseline Placement, Meaningful Results) */}
+            {activeSection === 'test' && (
+              <TestSection
+                allWords={words}
+                bibleWords={bibleWords}
+                profile={activeProfile}
+                assessmentHistory={assessments}
+                onSaveAssessment={handleSaveAssessment}
+                onAddXp={handleAddXp}
+                onSelectSection={handleNavigateSection}
+              />
+            )}
+
+            {/* 5. MY HOME (Reward World, Character & Room Customization) */}
+            {(activeSection === 'my_home' || activeSection === 'learning_home') && (
+              <LearningHome
+                profile={activeProfile}
+                words={words}
+                readingSessions={readingSessions}
+                onSelectSection={handleNavigateSection}
+                onUpdateProfile={updateActiveProfile}
               />
             )}
 
@@ -683,7 +748,7 @@ function MainAppContent() {
                   onSaveAssessment={handleSaveStartingAssessment}
                   onUpdateGoals={handleUpdateDailyGoals}
                   onSelectSection={handleNavigateSection}
-                  onClose={() => setActiveSection('home')}
+                  onClose={() => setActiveSection('learn')}
                 />
               </div>
             )}
@@ -699,16 +764,6 @@ function MainAppContent() {
               </div>
             )}
 
-            {activeSection === 'learning_home' && (
-              <LearningHome
-                profile={activeProfile}
-                words={words}
-                readingSessions={readingSessions}
-                onSelectSection={handleNavigateSection}
-                onUpdateProfile={updateActiveProfile}
-              />
-            )}
-
             {activeSection === 'flashcards' && (
               <FlashcardCenter
                 words={words}
@@ -716,7 +771,7 @@ function MainAppContent() {
                 onUpdateWordScore={handleUpdateWordScore}
                 onAddXp={handleAddXp}
                 onFlashcardReviewed={handleFlashcardReviewed}
-                onBackToHome={() => setActiveSection('home')}
+                onBackToHome={() => setActiveSection('learn')}
               />
             )}
 
@@ -727,20 +782,7 @@ function MainAppContent() {
                 onUpdateSpellingScore={handleUpdateSpellingScore}
                 onAddXp={handleAddXp}
                 onSpellingCompleted={handleSpellingCompleted}
-                onBackToHome={() => setActiveSection('home')}
-              />
-            )}
-
-            {activeSection === 'reading_adventure' && (
-              <ReadingAdventure
-                profile={activeProfile}
-                allWords={words}
-                readingSessions={readingSessions}
-                books={books}
-                onAddNewWord={handleAddNewWord}
-                onSessionComplete={handleReadingSessionComplete}
-                onAddXp={handleAddXp}
-                onBackToHome={() => setActiveSection('home')}
+                onBackToHome={() => setActiveSection('learn')}
               />
             )}
 

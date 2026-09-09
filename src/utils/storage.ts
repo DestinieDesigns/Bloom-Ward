@@ -180,8 +180,8 @@ export const saveStoredBadges = (badges: AchievementBadge[]) => {
 
 export const createFreshProfile = (
   name = 'Young Explorer',
-  avatar = '🌸',
-  theme: ThemeId = 'pink_garden'
+  avatar = '⭐',
+  theme: ThemeId = 'cozy_cottage'
 ): UserProfile => ({
   id: `prof-${Date.now()}`,
   name,
@@ -205,7 +205,8 @@ export const createFreshProfile = (
   totalReadingSessions: 0,
   lastReadingDate: '',
   onboardingCompleted: false,
-  initialAssessmentCompleted: false
+  initialAssessmentCompleted: false,
+  learningCoins: 350
 });
 
 export const DEFAULT_PROFILE: UserProfile = createFreshProfile();
@@ -224,7 +225,11 @@ export const getStoredProfile = (): UserProfile => {
         localStorage.removeItem(STORAGE_KEYS.VOCAB);
         return createFreshProfile();
       }
-      return { ...createFreshProfile(), ...parsed };
+      return {
+        ...createFreshProfile(),
+        ...parsed,
+        learningCoins: typeof parsed.learningCoins === 'number' ? parsed.learningCoins : 350
+      };
     }
   } catch {
     // ignore

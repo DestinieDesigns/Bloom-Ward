@@ -1,9 +1,20 @@
 export type MasteryLevel = 'new' | 'learning' | 'growing' | 'almost_mastered' | 'mastered';
 
 export type ThemeId =
-  | 'pink_garden'
-  | 'nature_adventure'
+  | 'cozy_cottage'
+  | 'modern_warm'
+  | 'nature'
+  | 'ocean'
   | 'space_explorer'
+  | 'creative_studio'
+  | 'gaming'
+  | 'sports'
+  | 'science_discovery'
+  | 'adventure'
+  | 'pink_garden'
+  | 'faith_scripture'
+  | 'warm_modern'
+  | 'nature_adventure'
   | 'fantasy_kingdom'
   | 'animal_world'
   | 'ocean_adventure'
@@ -301,6 +312,78 @@ export interface UserProfile {
   assessmentSaveState?: AssessmentSaveState | null;
   // Learning Home & Decorating Reward System
   learningHomeState?: UserLearningHomeState;
+  learningCoins?: number; // Educational rewards currency for HomeShop
+}
+
+export type ShopCategory =
+  | 'basic'
+  | 'bedroom'
+  | 'living_room'
+  | 'reading_study'
+  | 'decorations'
+  | 'lighting'
+  | 'windows_doors'
+  | 'walls_floors'
+  | 'seasonal'
+  | 'rewards';
+
+export type FurnitureCollection =
+  | 'basic'
+  | 'fall'
+  | 'halloween'
+  | 'winter'
+  | 'spring'
+  | 'summer'
+  | 'valentines'
+  | 'achievements'
+  | 'faith';
+
+export type ItemPlacement = 'floor' | 'wall' | 'surface' | 'ceiling';
+export type ItemSize = 'small' | 'medium' | 'large';
+
+export type FurnitureActionType =
+  | 'sit'
+  | 'sleep'
+  | 'relax'
+  | 'read'
+  | 'messBed'
+  | 'makeBed'
+  | 'turnOn'
+  | 'turnOff'
+  | 'openDoor'
+  | 'closeDoor'
+  | 'openWindow'
+  | 'closeWindow'
+  | 'waterPlant'
+  | 'observePlant'
+  | 'browseBooks'
+  | 'openDrawers'
+  | 'pet'
+  | 'play'
+  | 'stretch'
+  | 'groom'
+  | 'feed'
+  | 'hop'
+  | 'talk'
+  | 'fly';
+
+export interface CharacterCustomization {
+  skinTone: string; // Hex color or palette id
+  hairStyle: 'cozy_bun' | 'short_waves' | 'curls' | 'ponytail' | 'braids' | 'beanie';
+  hairColor: string;
+  outfitColor: string;
+  accessory?: 'reading_glasses' | 'flower_clip' | 'star_badge' | 'none';
+}
+
+export type CharacterAnimationState = 'idle' | 'walking' | 'sitting' | 'reading' | 'sleeping' | 'watering';
+
+export interface CharacterState {
+  x: number;
+  y: number;
+  facing: 'left' | 'right';
+  animation: CharacterAnimationState;
+  customization: CharacterCustomization;
+  currentInteractingItemId?: string | null;
 }
 
 export type HomeRoomId =
@@ -334,6 +417,7 @@ export interface PlacedHomeItem {
   scale: number; // 0.7 to 1.8
   rotation: number; // 0, 90, 180, 270 degrees
   zIndex: number;
+  state?: string; // e.g. 'neat' | 'messy' | 'turned_on' | 'turned_off' | 'open' | 'closed' | 'watered'
 }
 
 export interface HomeItem {
@@ -350,6 +434,14 @@ export interface HomeItem {
   defaultScale?: number;
   isResizable?: boolean;
   isRotatable?: boolean;
+  price?: number; // Price in LearningCoins
+  shopCategory?: ShopCategory;
+  collection?: FurnitureCollection;
+  placement?: ItemPlacement;
+  size?: ItemSize;
+  interactive?: boolean;
+  actions?: FurnitureActionType[];
+  renderType?: string; // Specialized miniature renderer key
   interactiveType?: 'reading_corner' | 'knowledge_desk' | 'spelling_station' | 'faith_corner' | 'companion_pet' | 'knowledge_flower';
   interactiveData?: {
     title?: string;
@@ -438,9 +530,16 @@ export interface UserLearningHomeState {
     reason: string;
     date: string;
   };
+  character?: CharacterState;
+  learningCoins?: number;
 }
 
 export type AppSection =
+  | 'learn'
+  | 'read'
+  | 'practice'
+  | 'test'
+  | 'my_home'
   | 'home'
   | 'learning_home'
   | 'sticker_book'
