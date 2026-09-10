@@ -10,7 +10,9 @@ import {
   Gamepad2,
   DoorOpen,
   X,
-  Palette
+  Palette,
+  HelpCircle,
+  ArrowLeft
 } from 'lucide-react';
 import {
   AppSection,
@@ -24,14 +26,15 @@ import {
   VocabWord,
   ReadingSession,
   CharacterState,
-  CharacterCustomization
+  CharacterCustomization,
+  FurnitureCollection
 } from '../types';
 import {
   ROOM_THEME_OPTIONS,
   INITIAL_ROOMS,
   INITIAL_HOME_ITEMS
 } from '../data/learningHomeData';
-import { STARTER_PACK_ITEM_IDS } from '../data/homeShopCatalog';
+import { STARTER_PACK_ITEM_IDS, SHOP_CATALOG_ITEMS, getShopItemById } from '../data/homeShopCatalog';
 import {
   loadLearningHomeState,
   saveLearningHomeState,
@@ -52,6 +55,12 @@ import { EarnedGiftModal } from './learningHome/EarnedGiftModal';
 import { HomeShop } from './learningHome/HomeShop';
 import { CharacterCustomizerModal } from './learningHome/CharacterCustomizerModal';
 import { DEFAULT_CHARACTER_CUSTOMIZATION } from './learningHome/HomeCharacter';
+import { DesktopShopSidebar } from './learningHome/DesktopShopSidebar';
+import { FurnitureCollectionBar } from './learningHome/FurnitureCollectionBar';
+import { ItemDetailsAndInteractions } from './learningHome/ItemDetailsAndInteractions';
+import { SeasonalCollectionsView } from './learningHome/SeasonalCollectionsView';
+import { CoinRewardGuideModal } from './learningHome/CoinRewardGuideModal';
+import { ItemDetailsModal } from './learningHome/ItemDetailsModal';
 import { sound } from '../utils/audio';
 
 interface LearningHomeProps {
@@ -113,7 +122,18 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
   const [isGardenOpen, setIsGardenOpen] = useState(false);
   const [isRoomSwitcherOpen, setIsRoomSwitcherOpen] = useState(false);
   const [isCharacterCustomizerOpen, setIsCharacterCustomizerOpen] = useState(false);
+  const [isCoinRewardGuideOpen, setIsCoinRewardGuideOpen] = useState(false);
+  const [isItemDetailsModalOpen, setIsItemDetailsModalOpen] = useState(false);
   const [saveToastVisible, setSaveToastVisible] = useState(false);
+
+  // Selected item for the Item Details & Interactive Preview panel
+  const [selectedItemForDetails, setSelectedItemForDetails] = useState<HomeItem | null>(() => {
+    return (
+      SHOP_CATALOG_ITEMS.find((i) => i.id === 'furn-classic-single-bed') ||
+      INITIAL_HOME_ITEMS[0] ||
+      null
+    );
+  });
 
   // User Coins
   const userCoins = profile.learningCoins ?? homeState.learningCoins ?? 350;
@@ -463,21 +483,33 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
 
         {/* Right: 🪙 Coin Balance, 🔥 Streak, 👤 Profile / Avatar Access */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* 🪙 Coin Balance */}
-          <button
-            id="learning-coins-header-pill"
-            onClick={() => {
-              sound.playPop();
-              setActiveMainView(activeMainView === 'shop' ? 'room' : 'shop');
-            }}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-100 to-amber-200/90 hover:from-amber-200 hover:to-amber-300 border border-amber-300 px-3 py-1.5 rounded-2xl shadow-2xs transition-transform active:scale-95 cursor-pointer"
-            title="LearningCoins balance. Tap to open Shop!"
-          >
-            <span className="text-base">🪙</span>
-            <span className="text-xs sm:text-sm font-black text-amber-950">
-              {userCoins.toLocaleString()}
-            </span>
-          </button>
+          {/* 🪙 Coin Balance & How to Earn Guide */}
+          <div className="flex items-center gap-1">
+            <button
+              id="learning-coins-header-pill"
+              onClick={() => {
+                sound.playPop();
+                setIsCoinRewardGuideOpen(true);
+              }}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-100 to-amber-200/90 hover:from-amber-200 hover:to-amber-300 border border-amber-300 px-3 py-1.5 rounded-2xl shadow-2xs transition-transform active:scale-95 cursor-pointer"
+              title="LearningCoins balance. Tap to see how to earn!"
+            >
+              <span className="text-base">🪙</span>
+              <span className="text-xs sm:text-sm font-black text-amber-950">
+                {userCoins.toLocaleString()}
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                sound.playPop();
+                setIsCoinRewardGuideOpen(true);
+              }}
+              className="w-7 h-7 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              title="How to Earn Coins"
+            >
+              ?
+            </button>
+          </div>
 
           {/* 🔥 Current Streak */}
           <div
@@ -527,6 +559,24 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
       {/* ========================================================= */}
       {activeMainView === 'shop' ? (
         <div className="bg-white rounded-3xl overflow-hidden shadow-xl border-2 border-amber-100 min-h-[580px]">
+          {/* Top navigation ribbon to return to room canvas */}
+          <div className="flex items-center justify-between px-6 py-3.5 bg-amber-50/90 border-b border-amber-200">
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveMainView('room');
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-amber-100/60 text-stone-800 font-extrabold text-xs border border-amber-200 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-700" />
+              <span>Return to Room Canvas</span>
+            </button>
+            <div className="flex items-center gap-2 text-xs font-black text-amber-950">
+              <span className="text-stone-500 font-medium">Available:</span>
+              <span>🪙 {userCoins.toLocaleString()} Coins</span>
+            </div>
+          </div>
+
           <HomeShop
             userCoins={userCoins}
             unlockedItemIds={homeState.unlockedItemIds}
@@ -548,150 +598,227 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
           onSwitchToRoomDecorator={() => setActiveMainView('room')}
         />
       ) : (
-        <RoomCanvas
-          room={activeRoom}
-          onUpdatePlacedItems={handleUpdatePlacedItems}
-          onRemoveItem={handleRemoveItem}
-          onStoreItem={handleStoreItem}
-          onSelectSection={onSelectSection}
-          isDecoratingMode={isDecoratingMode}
-          character={homeState.character}
-          onUpdateCharacter={handleUpdateCharacter}
-          themeId={profile.theme}
-          onUndo={handleUndo}
-          canUndo={history.length > 0}
-        />
-      )}
+        <div className="space-y-6">
+          {/* ========================================================= */}
+          {/* 🏡 2A. DESKTOP 2-COLUMN DASHBOARD (ROOM ON LEFT, SHOP ON RIGHT) */}
+          {/* ========================================================= */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Left Column: Room Canvas + Play/Decorate/Shop Navigation Bar */}
+            <div className="lg:col-span-7 xl:col-span-8 space-y-3">
+              <RoomCanvas
+                room={activeRoom}
+                onUpdatePlacedItems={handleUpdatePlacedItems}
+                onRemoveItem={handleRemoveItem}
+                onStoreItem={handleStoreItem}
+                onSelectSection={onSelectSection}
+                isDecoratingMode={isDecoratingMode}
+                character={homeState.character}
+                onUpdateCharacter={handleUpdateCharacter}
+                themeId={profile.theme}
+                onUndo={handleUndo}
+                canUndo={history.length > 0}
+              />
 
-      {/* ========================================================= */}
-      {/* 🎮 3. BOTTOM NAVIGATION: Progressive Disclosure */}
-      {/* Play Mode -> [Play, Decorate, Shop] */}
-      {/* Decorate Mode -> [Furniture, Decor, Room, Undo, Done] */}
-      {/* ========================================================= */}
-      {activeMainView === 'room' && (
-        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-2.5 sm:p-3.5 border-2 border-amber-100 shadow-sm flex items-center justify-between gap-2 max-w-2xl mx-auto">
-          {!isDecoratingMode ? (
-            /* --- PLAY MODE: 3 Primary Actions (Section 1) --- */
-            <div className="flex items-center justify-center gap-3 w-full">
-              {/* 🎮 Play */}
-              <button
-                id="home-mode-play-btn"
-                onClick={handleEnterPlay}
-                className="flex-1 py-3 px-4 rounded-2xl bg-amber-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
-              >
-                <Gamepad2 className="w-4 h-4" />
-                <span>Play</span>
-              </button>
+              {/* 🎮 Bottom Navigation Mode Bar */}
+              <div className="bg-white/95 backdrop-blur-md rounded-3xl p-2.5 sm:p-3.5 border-2 border-amber-100 shadow-sm flex items-center justify-between gap-2 max-w-2xl mx-auto">
+                {!isDecoratingMode ? (
+                  /* --- PLAY MODE: 3 Primary Actions --- */
+                  <div className="flex items-center justify-center gap-3 w-full">
+                    {/* 🎮 Play */}
+                    <button
+                      id="home-mode-play-btn"
+                      onClick={handleEnterPlay}
+                      className="flex-1 py-3 px-4 rounded-2xl bg-amber-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all active:scale-95"
+                    >
+                      <Gamepad2 className="w-4 h-4" />
+                      <span>Play</span>
+                    </button>
 
-              {/* ✨ Decorate */}
-              <button
-                id="home-mode-decorate-btn"
-                onClick={handleEnterDecorate}
-                className="flex-1 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-              >
-                <Sparkles className="w-4 h-4 text-amber-600" />
-                <span>Decorate</span>
-              </button>
+                    {/* ✨ Decorate */}
+                    <button
+                      id="home-mode-decorate-btn"
+                      onClick={handleEnterDecorate}
+                      className="flex-1 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span>Decorate</span>
+                    </button>
 
-              {/* 🛍️ Shop */}
-              <button
-                id="home-mode-shop-btn"
-                onClick={() => {
-                  sound.playPop();
-                  setActiveMainView('shop');
+                    {/* 🛍️ Shop */}
+                    <button
+                      id="home-mode-shop-btn"
+                      onClick={() => {
+                        sound.playPop();
+                        setActiveMainView('shop');
+                      }}
+                      className="flex-1 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                    >
+                      <ShoppingBag className="w-4 h-4 text-amber-600" />
+                      <span>Shop</span>
+                    </button>
+                  </div>
+                ) : (
+                  /* --- DECORATE MODE: Dedicated Actions --- */
+                  <div className="flex items-center justify-between gap-2 w-full">
+                    {/* Categories Pills */}
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {/* 🪑 Furniture */}
+                      <button
+                        onClick={() => {
+                          sound.playPop();
+                          setDecorateTab('furniture');
+                          setIsDecorateDrawerOpen(true);
+                        }}
+                        className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                          isDecorateDrawerOpen && decorateTab === 'furniture'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
+                        }`}
+                      >
+                        <span>🪑</span>
+                        <span>Furniture</span>
+                      </button>
+
+                      {/* 🌸 Decor */}
+                      <button
+                        onClick={() => {
+                          sound.playPop();
+                          setDecorateTab('decor');
+                          setIsDecorateDrawerOpen(true);
+                        }}
+                        className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                          isDecorateDrawerOpen && decorateTab === 'decor'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
+                        }`}
+                      >
+                        <span>🌸</span>
+                        <span>Decor</span>
+                      </button>
+
+                      {/* 🧱 Room */}
+                      <button
+                        onClick={() => {
+                          sound.playPop();
+                          setDecorateTab('room');
+                          setIsDecorateDrawerOpen(true);
+                        }}
+                        className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                          isDecorateDrawerOpen && decorateTab === 'room'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
+                        }`}
+                      >
+                        <span>🧱</span>
+                        <span>Room</span>
+                      </button>
+                    </div>
+
+                    {/* Action Controls: Undo & Done */}
+                    <div className="flex items-center gap-1.5">
+                      {/* ↩️ Undo */}
+                      <button
+                        onClick={handleUndo}
+                        disabled={history.length === 0}
+                        className={`p-2 sm:px-3 sm:py-2 rounded-2xl font-extrabold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
+                          history.length === 0
+                            ? 'text-stone-300 cursor-not-allowed bg-stone-50'
+                            : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                        }`}
+                        title="Undo last change"
+                      >
+                        <Undo2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Undo</span>
+                      </button>
+
+                      {/* ✓ Done */}
+                      <button
+                        onClick={handleEnterPlay}
+                        className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95"
+                        title="Finish decorating and enter Play Mode"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Done</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Desktop Shop Sidebar (Hidden on mobile, visible on desktop) */}
+            <div className="hidden lg:block lg:col-span-5 xl:col-span-4">
+              <DesktopShopSidebar
+                userCoins={userCoins}
+                unlockedItemIds={homeState.unlockedItemIds}
+                inventory={homeState.inventory || {}}
+                placedItemIds={activeRoom.placedItems.map((p) => p.itemId)}
+                onBuyItem={handleBuyItem}
+                onPlaceItem={(item) => {
+                  handlePlaceItem(item);
+                  setIsDecoratingMode(true);
                 }}
-                className="flex-1 py-3 px-4 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-              >
-                <ShoppingBag className="w-4 h-4 text-amber-600" />
-                <span>Shop</span>
-              </button>
+                onSelectItemForInspection={(item) => {
+                  setSelectedItemForDetails(item);
+                }}
+                onOpenFullShop={() => setActiveMainView('shop')}
+                selectedItemId={selectedItemForDetails?.id}
+              />
             </div>
-          ) : (
-            /* --- DECORATE MODE: Dedicated Actions (Section 4) --- */
-            <div className="flex items-center justify-between gap-2 w-full">
-              {/* Categories Pills */}
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* 🪑 Furniture */}
-                <button
-                  onClick={() => {
-                    sound.playPop();
-                    setDecorateTab('furniture');
-                    setIsDecorateDrawerOpen(true);
-                  }}
-                  className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
-                    isDecorateDrawerOpen && decorateTab === 'furniture'
-                      ? 'bg-amber-500 text-white shadow-xs'
-                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
-                  }`}
-                >
-                  <span>🪑</span>
-                  <span>Furniture</span>
-                </button>
+          </div>
 
-                {/* 🌸 Decor */}
-                <button
-                  onClick={() => {
-                    sound.playPop();
-                    setDecorateTab('decor');
-                    setIsDecorateDrawerOpen(true);
-                  }}
-                  className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
-                    isDecorateDrawerOpen && decorateTab === 'decor'
-                      ? 'bg-amber-500 text-white shadow-xs'
-                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
-                  }`}
-                >
-                  <span>🌸</span>
-                  <span>Decor</span>
-                </button>
+          {/* ========================================================= */}
+          {/* 🛋️ 2B. FURNITURE & DECORATION COLLECTION */}
+          {/* ========================================================= */}
+          <FurnitureCollectionBar
+            unlockedItemIds={homeState.unlockedItemIds}
+            inventory={homeState.inventory || {}}
+            placedItems={activeRoom.placedItems}
+            onPlaceItem={(item) => {
+              handlePlaceItem(item);
+              setIsDecoratingMode(true);
+            }}
+            onSelectItemForInspection={(item) => {
+              setSelectedItemForDetails(item);
+            }}
+            onOpenShop={() => setActiveMainView('shop')}
+            selectedItemId={selectedItemForDetails?.id}
+          />
 
-                {/* 🧱 Room */}
-                <button
-                  onClick={() => {
-                    sound.playPop();
-                    setDecorateTab('room');
-                    setIsDecorateDrawerOpen(true);
-                  }}
-                  className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
-                    isDecorateDrawerOpen && decorateTab === 'room'
-                      ? 'bg-amber-500 text-white shadow-xs'
-                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
-                  }`}
-                >
-                  <span>🧱</span>
-                  <span>Room</span>
-                </button>
-              </div>
+          {/* ========================================================= */}
+          {/* 📦 2C. ITEM DETAILS & INTERACTIVE ITEMS (2-COLUMN) */}
+          {/* ========================================================= */}
+          <ItemDetailsAndInteractions
+            selectedItem={selectedItemForDetails}
+            unlockedItemIds={homeState.unlockedItemIds}
+            inventory={homeState.inventory || {}}
+            userCoins={userCoins}
+            onBuyItem={handleBuyItem}
+            onPlaceItem={(item) => {
+              handlePlaceItem(item);
+              setIsDecoratingMode(true);
+            }}
+            onSelectInteractiveItemExample={(itemId) => {
+              const it = SHOP_CATALOG_ITEMS.find((i) => i.id === itemId);
+              if (it) {
+                setSelectedItemForDetails(it);
+              }
+            }}
+          />
 
-              {/* Action Controls: Undo & Done */}
-              <div className="flex items-center gap-1.5">
-                {/* ↩️ Undo */}
-                <button
-                  onClick={handleUndo}
-                  disabled={history.length === 0}
-                  className={`p-2 sm:px-3 sm:py-2 rounded-2xl font-extrabold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
-                    history.length === 0
-                      ? 'text-stone-300 cursor-not-allowed bg-stone-50'
-                      : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
-                  }`}
-                  title="Undo last change"
-                >
-                  <Undo2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Undo</span>
-                </button>
-
-                {/* ✓ Done */}
-                <button
-                  onClick={handleEnterPlay}
-                  className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-95"
-                  title="Finish decorating and enter Play Mode"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Done</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* ========================================================= */}
+          {/* 🍂 2D. SEASONAL COLLECTIONS */}
+          {/* ========================================================= */}
+          <SeasonalCollectionsView
+            unlockedItemIds={homeState.unlockedItemIds}
+            inventory={homeState.inventory || {}}
+            onSelectSeasonalItem={(item) => {
+              setSelectedItemForDetails(item);
+            }}
+            onOpenShopToSeason={() => {
+              setActiveMainView('shop');
+            }}
+          />
         </div>
       )}
 
@@ -777,6 +904,39 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
           setEarnedGift(null);
         }}
         onDismiss={() => setEarnedGift(null)}
+      />
+
+      {/* 🪙 How to Earn Learning Coins Guide Modal */}
+      <CoinRewardGuideModal
+        isOpen={isCoinRewardGuideOpen}
+        onClose={() => setIsCoinRewardGuideOpen(false)}
+        userCoins={userCoins}
+        streakDays={profile.streakDays || 1}
+      />
+
+      {/* 📦 Focused Item Details Modal (on deep inspect) */}
+      <ItemDetailsModal
+        item={selectedItemForDetails}
+        isOpen={isItemDetailsModalOpen}
+        onClose={() => setIsItemDetailsModalOpen(false)}
+        isUnlocked={
+          selectedItemForDetails
+            ? homeState.unlockedItemIds.includes(selectedItemForDetails.id) ||
+              selectedItemForDetails.unlocked
+            : false
+        }
+        inventoryCount={
+          selectedItemForDetails
+            ? homeState.inventory?.[selectedItemForDetails.id] || 0
+            : 0
+        }
+        userCoins={userCoins}
+        onBuyItem={handleBuyItem}
+        onPlaceItem={(item) => {
+          handlePlaceItem(item);
+          setIsItemDetailsModalOpen(false);
+          setIsDecoratingMode(true);
+        }}
       />
     </div>
   );

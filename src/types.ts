@@ -445,6 +445,7 @@ export interface HomeItem {
   name: string;
   category: ItemCategory;
   icon: string; // emoji representation
+  image?: string; // image path or data URI for shop
   visualStyle?: HomeStyleTheme | 'general';
   description: string;
   unlocked: boolean;
@@ -472,6 +473,10 @@ export interface HomeItem {
     word?: string;
     definition?: string;
   };
+}
+
+export interface FurnitureItem extends HomeItem {
+  image: string;
 }
 
 export interface HomeRoom {
