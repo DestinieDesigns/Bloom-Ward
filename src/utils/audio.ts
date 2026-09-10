@@ -87,6 +87,37 @@ class SoundEngine {
     }
   }
 
+  // Soft, peaceful harmonic chime specifically designed for reading milestones
+  public playQuietReadingBell() {
+    if (!this.soundEnabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      // Gentle singing-bowl / soft celesta tones (D5 & A5 harmony)
+      const freqs = [587.33, 880];
+      freqs.forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+
+        gain.gain.setValueAtTime(0, now + idx * 0.05);
+        gain.gain.linearRampToValueAtTime(0.08, now + idx * 0.05 + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.05 + 1.4);
+
+        osc.connect(gain);
+        gain.connect(this.ctx!.destination);
+
+        osc.start(now + idx * 0.05);
+        osc.stop(now + idx * 0.05 + 1.5);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
   public playBloomSparkle() {
     if (!this.soundEnabled) return;
     try {

@@ -538,15 +538,45 @@ function MainAppContent() {
       readingMinutes: currentActivity.readingMinutes + session.minutesRead
     };
 
+    // Reset character animation to idle if in learning home
+    const updatedHomeState = activeProfile.learningHomeState?.character
+      ? {
+          ...activeProfile.learningHomeState,
+          character: {
+            ...activeProfile.learningHomeState.character,
+            animation: 'idle' as const
+          }
+        }
+      : activeProfile.learningHomeState;
+
     updateActiveProfile({
       totalReadingMinutes: activeProfile.totalReadingMinutes + session.minutesRead,
       totalReadingSessions: activeProfile.totalReadingSessions + 1,
       readingStreak: newStreak,
       longestReadingStreak: Math.max(activeProfile.longestReadingStreak, newStreak),
       lastReadingDate: todayStr,
-      todayActivity: updatedActivity
+      todayActivity: updatedActivity,
+      learningHomeState: updatedHomeState
     });
   };
+
+  const handleReadingStateChange = useCallback((isReading: boolean) => {
+    const targetAnim = isReading ? ('reading' as const) : ('idle' as const);
+    if (activeProfile.learningHomeState?.character) {
+      if (activeProfile.learningHomeState.character.animation === targetAnim) {
+        return;
+      }
+      updateActiveProfile({
+        learningHomeState: {
+          ...activeProfile.learningHomeState,
+          character: {
+            ...activeProfile.learningHomeState.character,
+            animation: targetAnim
+          }
+        }
+      });
+    }
+  }, [activeProfile.learningHomeState, updateActiveProfile]);
 
   // Garden Water Handler
   const handleWaterPlot = (plotId: string) => {
@@ -772,6 +802,8 @@ function MainAppContent() {
                 onAddNewWord={handleAddNewWord}
                 onSessionComplete={handleReadingSessionComplete}
                 onAddXp={handleAddXp}
+                onAddCoins={handleAddCoins}
+                onReadingStateChange={handleReadingStateChange}
                 onBackToHome={() => setActiveSection('learn')}
               />
             )}

@@ -35,6 +35,8 @@ import { triggerSparkleConfetti, triggerCelebrationConfetti } from '../utils/sto
 import { getThemeConfig } from '../data/themes';
 import { getMasteryIcon, getMasteryLabel } from '../utils/adaptive';
 import { getSyllables, getMemoryTip } from '../utils/dailyLearningHelper';
+import { TodayWordsCarousel } from './home/TodayWordsCarousel';
+import { WordOfTheDayCard } from './home/WordOfTheDayCard';
 
 interface LearnSectionProps {
   profile: UserProfile;
@@ -67,6 +69,7 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   const [activeTab, setActiveTab] = useState<VocabTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState<'all' | 'easy' | 'medium' | 'challenging'>('all');
+  const [showFullLibrary, setShowFullLibrary] = useState(false);
 
   // Word Detail Modal state
   const [selectedWord, setSelectedWord] = useState<VocabWord | null>(null);
@@ -404,296 +407,337 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         </div>
       </section>
 
-      {/* 3. VOCABULARY EXPLORER (Data-driven, full Wonders Glossary + Bible + My Words) */}
-      <section className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-stone-200/80 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-extrabold text-stone-900 font-['Fredoka'] flex items-center gap-2">
-              <span>📖 Vocabulary Library</span>
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
-                {vocabWords.length} words
-              </span>
-            </h2>
-            <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
-              Includes Wonders McGraw-Hill grade-level words, reading discoveries, and faith vocabulary.
-            </p>
-          </div>
+      {/* 3. TODAY'S WORDS: INTERACTIVE FLASHCARD CAROUSEL / SLIDE DECK */}
+      <TodayWordsCarousel
+        vocabWords={vocabWords}
+        profile={profile}
+        onUpdateWordScore={onUpdateWordScore}
+        onAddNewWord={onAddNewWord}
+        onAddXp={onAddXp}
+        onOpenPractice={() => onSelectSection('practice')}
+        onOpenWordDetail={handleOpenWordDetail}
+        onExploreFullLibrary={() => setShowFullLibrary((prev) => !prev)}
+        themeIcon={theme.icon || '🧠'}
+      />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                sound.playPop();
-                setShowAddModal(true);
-              }}
-              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Add Word</span>
-            </button>
-            {onOpenHomework && (
+      {/* 🌟 WORD OF THE DAY (Separate, featuring 1 word) */}
+      <WordOfTheDayCard
+        vocabWords={vocabWords}
+        bibleWords={bibleWords}
+        onOpenWordDetail={handleOpenWordDetail}
+        onPracticeWords={() => onSelectSection('practice')}
+        themeIcon={theme.icon || '🌟'}
+      />
+
+      {/* 4. COMPLETE VOCABULARY LIBRARY (Preserved & accessible via toggle / Practice Words) */}
+      {showFullLibrary && (
+        <section
+          id="full-vocabulary-library-section"
+          className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-stone-200/80 shadow-sm space-y-6 animate-in fade-in duration-300"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-extrabold text-stone-900 font-['Fredoka'] flex items-center gap-2">
+                  <span>📖 Complete Vocabulary Library</span>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
+                    {vocabWords.length} words
+                  </span>
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
+                Central database: Wonders grade-level curriculum, reading discoveries, homework, and faith vocabulary.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   sound.playPop();
-                  onOpenHomework();
+                  setShowAddModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add Word</span>
+              </button>
+              {onOpenHomework && (
+                <button
+                  onClick={() => {
+                    sound.playPop();
+                    onOpenHomework();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold border border-stone-200 cursor-pointer flex items-center gap-1.5"
+                >
+                  <GraduationCap className="w-4 h-4 text-stone-600" />
+                  <span>Homework</span>
+                </button>
+              )}
+              <button
+                id="btn-hide-full-library"
+                onClick={() => {
+                  sound.playPop();
+                  setShowFullLibrary(false);
                 }}
                 className="px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold border border-stone-200 cursor-pointer flex items-center gap-1.5"
+                title="Hide vocabulary library"
               >
-                <GraduationCap className="w-4 h-4 text-stone-600" />
-                <span>Homework</span>
+                <X className="w-4 h-4" />
+                <span>Hide Library</span>
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 pb-4">
-          <button
-            onClick={() => {
-              sound.playPop();
-              setActiveTab('all');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'all'
-                ? 'bg-stone-900 text-white shadow-xs'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
-          >
-            All Words ({vocabWords.length})
-          </button>
-
-          <button
-            onClick={() => {
-              sound.playPop();
-              setActiveTab('new');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'new'
-                ? 'bg-amber-700 text-white shadow-xs'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
-          >
-            <span>🆕 New Words</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-200/50 text-amber-900 font-mono">
-              {newWordsCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              sound.playPop();
-              setActiveTab('my_words');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'my_words'
-                ? 'bg-sky-700 text-white shadow-xs'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
-          >
-            <span>🏷️ My Words</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-200/50 text-sky-900 font-mono">
-              {myWordsList.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              sound.playPop();
-              setActiveTab('bible');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'bible'
-                ? 'bg-purple-800 text-white shadow-xs'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
-          >
-            <span>📜 Bible Words</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-200/50 text-purple-900 font-mono">
-              {bibleWords.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              sound.playPop();
-              setActiveTab('wonders');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'wonders'
-                ? 'bg-stone-800 text-white shadow-xs'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
-          >
-            Wonders Glossary
-          </button>
-
-          <button
-            onClick={() => {
-              sound.playPop();
-              setActiveTab('mastered');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'mastered'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-            }`}
-          >
-            <span>👑 Mastered</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-200/50 text-emerald-900 font-mono">
-              {masteredCount}
-            </span>
-          </button>
-        </div>
-
-        {/* Search and Difficulty Filter Controls */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search words, meanings, or categories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 bg-stone-50/50"
-            />
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 w-full sm:w-auto">
-            <span className="text-xs text-stone-400 font-semibold hidden sm:inline">Difficulty:</span>
-            {(['all', 'easy', 'medium', 'challenging'] as const).map((diff) => (
-              <button
-                key={diff}
-                onClick={() => setDifficultyFilter(diff)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors cursor-pointer ${
-                  difficultyFilter === diff
-                    ? 'bg-stone-800 text-white'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                {diff}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Words Grid or Bible Words View */}
-        {activeTab === 'bible' ? (
-          /* Bible Words Grid */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {bibleWords.map((bWord) => (
-              <div
-                key={bWord.id}
-                onClick={() => handleOpenBibleWordDetail(bWord)}
-                className="p-5 rounded-2xl border-2 border-purple-100 bg-purple-50/20 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-3"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full">
-                      {bWord.scriptureReference}
-                    </span>
-                    {bWord.mastered && (
-                      <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Mastered
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-2xl font-extrabold text-stone-900 font-['Fredoka']">
-                    {bWord.word}
-                  </h3>
-                  <p className="text-xs text-stone-500 italic mt-0.5">
-                    /{bWord.pronunciation}/
-                  </p>
-                  <p className="text-xs sm:text-sm text-stone-700 mt-2 line-clamp-2 leading-relaxed">
-                    {bWord.childDefinition}
-                  </p>
-                </div>
-                <div className="pt-2 border-t border-purple-100/60 flex items-center justify-between text-xs font-bold text-purple-700">
-                  <span>Scripture & Practice</span>
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filteredWords.length === 0 ? (
-          <div className="py-12 text-center text-stone-400 space-y-2">
-            <p className="text-base font-semibold">No words match your current filters.</p>
+          {/* Filter Navigation Tabs */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 pb-4">
             <button
               onClick={() => {
-                setSearchQuery('');
+                sound.playPop();
                 setActiveTab('all');
-                setDifficultyFilter('all');
               }}
-              className="text-xs font-bold text-amber-700 hover:underline cursor-pointer"
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'all'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
             >
-              Reset filters
+              All Words ({vocabWords.length})
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveTab('new');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'new'
+                  ? 'bg-amber-700 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              <span>🆕 New Words</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-200/50 text-amber-900 font-mono">
+                {newWordsCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveTab('my_words');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'my_words'
+                  ? 'bg-sky-700 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              <span>🏷️ My Words</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-200/50 text-sky-900 font-mono">
+                {myWordsList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveTab('bible');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'bible'
+                  ? 'bg-purple-800 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              <span>📜 Bible Words</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-200/50 text-purple-900 font-mono">
+                {bibleWords.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveTab('wonders');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'wonders'
+                  ? 'bg-stone-800 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              Wonders Glossary
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playPop();
+                setActiveTab('mastered');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'mastered'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+              }`}
+            >
+              <span>👑 Mastered</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-200/50 text-emerald-900 font-mono">
+                {masteredCount}
+              </span>
             </button>
           </div>
-        ) : (
-          /* Standard Vocab Words Grid */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredWords.map((word) => (
-              <div
-                key={word.id}
-                onClick={() => handleOpenWordDetail(word)}
-                className="p-5 rounded-2xl border-2 border-stone-200/80 bg-white hover:border-amber-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-3 group"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600 bg-stone-100 px-2.5 py-0.5 rounded-full">
-                        {word.partOfSpeech}
+
+          {/* Search and Difficulty Filter Controls */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search words, meanings, or categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 bg-stone-50/50"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <span className="text-xs text-stone-400 font-semibold hidden sm:inline">Difficulty:</span>
+              {(['all', 'easy', 'medium', 'challenging'] as const).map((diff) => (
+                <button
+                  key={diff}
+                  onClick={() => setDifficultyFilter(diff)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors cursor-pointer ${
+                    difficultyFilter === diff
+                      ? 'bg-stone-800 text-white'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  {diff}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Words Grid or Bible Words View */}
+          {activeTab === 'bible' ? (
+            /* Bible Words Grid */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bibleWords.map((bWord) => (
+                <div
+                  key={bWord.id}
+                  onClick={() => handleOpenBibleWordDetail(bWord)}
+                  className="p-5 rounded-2xl border-2 border-purple-100 bg-purple-50/20 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-3"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full">
+                        {bWord.scriptureReference}
                       </span>
-                      {word.isHomework && (
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                          🎒 Homework
-                        </span>
-                      )}
-                      {word.sourceType === 'reading' && (
-                        <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
-                          📖 Book
+                      {bWord.mastered && (
+                        <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Mastered
                         </span>
                       )}
                     </div>
-                    <span className="text-xs" title={getMasteryLabel(word.masteryLevel)}>
-                      {getMasteryIcon(word.masteryLevel)}
+                    <h3 className="text-2xl font-extrabold text-stone-900 font-['Fredoka']">
+                      {bWord.word}
+                    </h3>
+                    <p className="text-xs text-stone-500 italic mt-0.5">
+                      /{bWord.pronunciation}/
+                    </p>
+                    <p className="text-xs sm:text-sm text-stone-700 mt-2 line-clamp-2 leading-relaxed">
+                      {bWord.childDefinition}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-purple-100/60 flex items-center justify-between text-xs font-bold text-purple-700">
+                    <span>Scripture & Practice</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredWords.length === 0 ? (
+            <div className="py-12 text-center text-stone-400 space-y-2">
+              <p className="text-base font-semibold">No words match your current filters.</p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setActiveTab('all');
+                  setDifficultyFilter('all');
+                }}
+                className="text-xs font-bold text-amber-700 hover:underline cursor-pointer"
+              >
+                Reset filters
+              </button>
+            </div>
+          ) : (
+            /* Standard Vocab Words Grid */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredWords.map((word) => (
+                <div
+                  key={word.id}
+                  onClick={() => handleOpenWordDetail(word)}
+                  className="p-5 rounded-2xl border-2 border-stone-200/80 bg-white hover:border-amber-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-3 group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600 bg-stone-100 px-2.5 py-0.5 rounded-full">
+                          {word.partOfSpeech}
+                        </span>
+                        {word.isHomework && (
+                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                            🎒 Homework
+                          </span>
+                        )}
+                        {word.sourceType === 'reading' && (
+                          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                            📖 Book
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs" title={getMasteryLabel(word.masteryLevel)}>
+                        {getMasteryIcon(word.masteryLevel)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-2xl font-extrabold text-stone-900 font-['Fredoka'] group-hover:text-amber-800 transition-colors">
+                        {word.word}
+                      </h3>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sound.speak(word.word);
+                        }}
+                        className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                        title="Hear pronunciation"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-stone-500 italic mt-0.5">
+                      /{word.pronunciation}/
+                    </p>
+
+                    <p className="text-xs sm:text-sm text-stone-600 mt-2 line-clamp-2 leading-relaxed">
+                      {word.definition}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-stone-400">
+                    <span className="capitalize">{word.difficulty} • Grade {word.gradeLevel}</span>
+                    <span className="text-amber-700 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                      Study <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-2xl font-extrabold text-stone-900 font-['Fredoka'] group-hover:text-amber-800 transition-colors">
-                      {word.word}
-                    </h3>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sound.speak(word.word);
-                      }}
-                      className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
-                      title="Hear pronunciation"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-stone-500 italic mt-0.5">
-                    /{word.pronunciation}/
-                  </p>
-
-                  <p className="text-xs sm:text-sm text-stone-600 mt-2 line-clamp-2 leading-relaxed">
-                    {word.definition}
-                  </p>
                 </div>
-
-                <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-stone-400">
-                  <span className="capitalize">{word.difficulty} • Grade {word.gradeLevel}</span>
-                  <span className="text-amber-700 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                    Study <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 4. WORD DETAIL MODAL (Progressive Disclosure: Hear It, Say It, Spell It, Use It) */}
       {selectedWord && (

@@ -88,6 +88,16 @@ export interface VocabWord {
   lastFlashcardDate?: string;
 }
 
+export interface ReadingDiscoveredWordDetail {
+  word: string;
+  pronunciation?: string;
+  definition?: string;
+  simpleDefinition?: string;
+  example?: string;
+  source?: string;
+  isBibleWord?: boolean;
+}
+
 export interface ReadingSession {
   id: string;
   date: string;
@@ -98,8 +108,16 @@ export interface ReadingSession {
   minutesRead: number;
   targetMinutes: number;
   wordsDiscovered: string[]; // list of words found
+  wordsDiscoveredDetails?: ReadingDiscoveredWordDetail[];
   xpEarned: number;
+  coinsEarned?: number;
   theme: ThemeId;
+  startTime?: number; // timestamp
+  activeSeconds?: number;
+  pausedSeconds?: number;
+  selectedGoalMinutes?: number;
+  goalCompleted?: boolean;
+  totalDurationSeconds?: number;
 }
 
 export interface BookRecord {

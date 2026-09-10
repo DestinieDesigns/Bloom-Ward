@@ -88,16 +88,29 @@ export const DailyTracker: React.FC<DailyTrackerProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Streak Indicator */}
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-orange-50 border border-orange-200">
-              <Flame className="w-5 h-5 fill-orange-500 text-orange-500" />
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Learning Streak Indicator */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-orange-50 border border-orange-200 shadow-2xs">
+              <Flame className="w-5 h-5 fill-orange-500 text-orange-500 shrink-0" />
               <div>
                 <div className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">
-                  Streak
+                  Learning Streak
                 </div>
-                <div className="text-base font-extrabold text-orange-700 font-['Fredoka'] leading-none">
+                <div className="text-sm sm:text-base font-extrabold text-orange-700 font-['Fredoka'] leading-none">
                   {profile.streak} Days
+                </div>
+              </div>
+            </div>
+
+            {/* Reading Streak Indicator */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-pink-50 border border-pink-200 shadow-2xs">
+              <BookOpen className="w-5 h-5 text-pink-500 shrink-0" />
+              <div>
+                <div className="text-[10px] text-pink-600 font-bold uppercase tracking-wider">
+                  Reading Streak
+                </div>
+                <div className="text-sm sm:text-base font-extrabold text-pink-700 font-['Fredoka'] leading-none">
+                  {profile.readingStreak || 0} Days
                 </div>
               </div>
             </div>
@@ -296,7 +309,10 @@ export const DailyTracker: React.FC<DailyTrackerProps> = ({
 
                     <div className="text-xs text-slate-500 font-semibold mt-0.5">
                       {item.isComplete ? (
-                        <span className="text-emerald-600 font-bold">Goal Completed!</span>
+                        <span className="text-emerald-600 font-bold flex items-center gap-1">
+                          <span>✓ Completed</span>
+                          <span className="text-[11px] font-normal text-emerald-700">({item.current} / {item.target} {item.unit})</span>
+                        </span>
                       ) : (
                         <span>
                           {item.current} / {item.target} {item.unit}

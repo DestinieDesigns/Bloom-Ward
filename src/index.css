@@ -62,3 +62,25 @@
 .animate-twinkle {
   animation: sparkle-twinkle 2s ease-in-out infinite;
 }
+
+/* 3D Flashcard Flip utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-flip {
+    transition: opacity 0.2s ease-in-out !important;
+    transform: none !important;
+  }
+}

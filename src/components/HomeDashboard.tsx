@@ -30,6 +30,8 @@ import { getThemeConfig } from '../data/themes';
 import { sound } from '../utils/audio';
 import { triggerCelebrationConfetti, triggerSparkleConfetti } from '../utils/storage';
 import { DailyTracker } from './DailyTracker';
+import { TodayWordsCarousel } from './home/TodayWordsCarousel';
+import { WordOfTheDayCard } from './home/WordOfTheDayCard';
 
 interface HomeDashboardProps {
   profile: UserProfile;
@@ -43,6 +45,8 @@ interface HomeDashboardProps {
   onOpenThemes?: () => void;
   onOpenHomework?: () => void;
   onUpdateGoals?: (newGoals: DailyGoalConfig) => void;
+  onUpdateWordScore?: (word: VocabWord, isCorrect: boolean) => void;
+  onAddNewWord?: (word: VocabWord) => void;
 }
 
 export const HomeDashboard: React.FC<HomeDashboardProps> = ({
@@ -56,7 +60,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onWaterPlot,
   onOpenThemes,
   onOpenHomework,
-  onUpdateGoals
+  onUpdateGoals,
+  onUpdateWordScore = () => {},
+  onAddNewWord = () => {}
 }) => {
   const theme = getThemeConfig(profile.theme);
 
@@ -387,116 +393,26 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* Spotlights: Vocabulary Word of the Day & Bible Word of the Day */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-        {/* Vocab Spotlight */}
-        {spotlightWord && (
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border-2 border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-pink-600 bg-pink-50 px-3 py-1 rounded-full border border-pink-200">
-                  {theme.icon} Word Spotlight
-                </span>
-                <span className="text-xs text-slate-400 font-semibold">
-                  {spotlightWord.category}
-                </span>
-              </div>
+      {/* 🧠 TODAY'S WORDS: INTERACTIVE FLASHCARD CAROUSEL / SLIDE DECK */}
+      <TodayWordsCarousel
+        vocabWords={vocabWords}
+        profile={profile}
+        onUpdateWordScore={onUpdateWordScore}
+        onAddNewWord={onAddNewWord}
+        onAddXp={onAddXp}
+        onOpenPractice={() => onSelectSection('practice')}
+        onExploreFullLibrary={() => onSelectSection('learn')}
+        themeIcon={theme.icon || '🧠'}
+      />
 
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div>
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-['Fredoka'] capitalize">
-                    {spotlightWord.word}
-                  </h3>
-                  <p className="text-xs text-pink-500 italic">/{spotlightWord.pronunciation}/</p>
-                </div>
-
-                <button
-                  onClick={() => sound.speak(spotlightWord.word)}
-                  className="px-3.5 py-1.5 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Volume2 className="w-4 h-4" /> Listen
-                </button>
-              </div>
-
-              <p className="text-sm text-slate-700 font-medium mb-3">
-                {spotlightWord.definition}
-              </p>
-
-              <p className="text-xs sm:text-sm text-slate-600 italic bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                "{spotlightWord.exampleSentence}"
-              </p>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  sound.playPop();
-                  onSelectSection('review_garden');
-                }}
-                className="text-xs font-bold text-pink-600 hover:text-pink-700 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Explore Word Library</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-bold text-slate-400">Grade 4–5 Wonders</span>
-            </div>
-          </div>
-        )}
-
-        {/* Bible Word Spotlight */}
-        {dailyBibleWord && (
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border-2 border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
-                  ✝️ Faith Word of the Day
-                </span>
-                <span className="text-xs text-slate-400 font-semibold">
-                  {dailyBibleWord.scriptureReference}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div>
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-['Fredoka'] capitalize">
-                    {dailyBibleWord.word}
-                  </h3>
-                  <p className="text-xs text-purple-500 italic">/{dailyBibleWord.pronunciation}/</p>
-                </div>
-
-                <button
-                  onClick={() => sound.speak(dailyBibleWord.word)}
-                  className="px-3.5 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Volume2 className="w-4 h-4" /> Listen
-                </button>
-              </div>
-
-              <p className="text-sm text-slate-700 font-medium mb-3">
-                {dailyBibleWord.childDefinition}
-              </p>
-
-              <p className="text-xs sm:text-sm text-purple-800 italic bg-purple-50/60 p-3 rounded-2xl border border-purple-100">
-                "{dailyBibleWord.scriptureVerse}"
-              </p>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  sound.playPop();
-                  onSelectSection('faith_garden');
-                }}
-                className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Visit Faith Garden</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-bold text-purple-600">Peace & Kindness</span>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* 🌟 WORD OF THE DAY (Separate, featuring 1 word) */}
+      <WordOfTheDayCard
+        vocabWords={vocabWords}
+        bibleWords={bibleWords}
+        onOpenWordDetail={() => onSelectSection('learn')}
+        onPracticeWords={() => onSelectSection('practice')}
+        themeIcon={theme.icon || '🌟'}
+      />
 
       {/* Quick Launch Activities Bento */}
       <div className="text-left">
