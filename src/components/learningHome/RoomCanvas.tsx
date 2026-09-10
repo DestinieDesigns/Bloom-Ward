@@ -26,6 +26,7 @@ import { INITIAL_HOME_ITEMS } from '../../data/learningHomeData';
 import { MiniatureFurnitureRenderer } from './MiniatureFurnitureRenderer';
 import { HomeCharacter } from './HomeCharacter';
 import { DecorateControlPanel } from './DecorateControlPanel';
+import { PlayInteractionPanel, SelectedInteractiveObject } from './PlayInteractionPanel';
 import { sound } from '../../utils/audio';
 import { getThemeConfig } from '../../data/themes';
 
@@ -65,12 +66,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     description: string;
     targetSection: AppSection;
   } | null>(null);
-  const [activeFurnitureMenu, setActiveFurnitureMenu] = useState<{
-    instanceId: string;
-    item: HomeItem;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [selectedInteractiveObject, setSelectedInteractiveObject] = useState<SelectedInteractiveObject | null>(null);
   const [characterBubble, setCharacterBubble] = useState<string | null>(null);
   const [isMovingActive, setIsMovingActive] = useState(false);
 
@@ -106,12 +102,14 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     }
   }, [selectedInstanceId, room.placedItems]);
 
-  // If exiting decorate mode, clean up selection
+  // Mode transition cleanup
   useEffect(() => {
     if (!isDecoratingMode) {
       setSelectedInstanceId(null);
       setIsMovingActive(false);
       originalTransformRef.current = null;
+    } else {
+      setSelectedInteractiveObject(null);
     }
   }, [isDecoratingMode]);
 
@@ -125,6 +123,14 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
   const selectedPlacedItem = room.placedItems.find((p) => p.instanceId === selectedInstanceId);
   const selectedItemDef = selectedPlacedItem ? itemMap.current.get(selectedPlacedItem.itemId) : null;
+
+  // Active interactive item lookup for Play Mode
+  const activeSelectedInteractivePlaced = selectedInteractiveObject
+    ? room.placedItems.find((p) => p.instanceId === selectedInteractiveObject.instanceId) || selectedInteractiveObject.placed
+    : null;
+  const activeSelectedInteractiveDef = activeSelectedInteractivePlaced
+    ? itemMap.current.get(activeSelectedInteractivePlaced.itemId) || selectedInteractiveObject?.item
+    : null;
 
   // Global pointer up to end drag
   useEffect(() => {
@@ -151,7 +157,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
     sound.playPop();
     setSelectedInstanceId(placed.instanceId);
-    setActiveFurnitureMenu(null);
+    setSelectedInteractiveObject(null);
     isDraggingRef.current = true;
 
     if (!originalTransformRef.current || originalTransformRef.current.instanceId !== placed.instanceId) {
@@ -218,12 +224,26 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       return;
     }
 
-    setActiveFurnitureMenu(null);
-
     if (!canvasRef.current || !character || !onUpdateCharacter) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const clickX = Math.round(((e.clientX - rect.left) / rect.width) * 100);
     const clickY = Math.max(45, Math.min(88, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+
+    // Distance-based interaction buffer / hysteresis:
+    // If the player clicks far away across the room (>35%), close the panel.
+    // If the click is a minor adjustment near the object, keep the panel open.
+    if (selectedInteractiveObject) {
+      const targetPlaced =
+        room.placedItems.find((p) => p.instanceId === selectedInteractiveObject.instanceId) ||
+        selectedInteractiveObject.placed;
+      const dx = clickX - targetPlaced.x;
+      const dy = clickY - targetPlaced.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > 35) {
+        setSelectedInteractiveObject(null);
+      }
+    }
 
     const facing = clickX < character.x ? 'left' : 'right';
 
@@ -465,6 +485,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
     // Special item logic: Knowledge flower
     if (itemDef.interactiveType === 'knowledge_flower' && itemDef.interactiveData?.word) {
+      setSelectedInteractiveObject(null);
       setActiveWordCard({
         word: itemDef.interactiveData.word,
         definition: itemDef.interactiveData.definition || 'A marvelous word you mastered!'
@@ -474,6 +495,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
 
     // Special item logic: Station
     if (itemDef.interactiveData?.targetSection) {
+      setSelectedInteractiveObject(null);
       setInteractiveStation({
         title: itemDef.interactiveData.title || itemDef.name,
         description: itemDef.interactiveData.description || 'Open this interactive learning station.',
@@ -482,12 +504,11 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       return;
     }
 
-    // Display contextual interaction menu directly for animals, plants, furniture, etc.
-    setActiveFurnitureMenu({
+    // Set persistent interactive target (Play Mode)
+    setSelectedInteractiveObject({
       instanceId: placed.instanceId,
-      item: itemDef,
-      x: placed.x,
-      y: placed.y
+      placed,
+      item: itemDef
     });
   };
 
@@ -746,8 +767,6 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       setCharacterBubble(nextState === 'open' ? 'Fresh gentle air! 🌤️' : 'Snug and cozy! 🏡');
       setTimeout(() => setCharacterBubble(null), 2500);
     }
-
-    setActiveFurnitureMenu(null);
   };
 
   // Rotate item by 90 degrees
@@ -972,6 +991,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           if (!itemDef) return null;
 
           const isSelected = placed.instanceId === selectedInstanceId && isDecoratingMode;
+          const isInteractiveSelected = !isDecoratingMode && selectedInteractiveObject?.instanceId === placed.instanceId;
           const isSticker = itemDef.category === 'sticker';
 
           return (
@@ -979,11 +999,16 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
               key={placed.instanceId}
               id={`home-item-${placed.instanceId}`}
               onPointerDown={(e) => handleItemPointerDown(e, placed, itemDef)}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
               className={`absolute cursor-pointer ${
                 isDraggingRef.current && isSelected ? 'transition-none' : 'transition-transform'
               } ${
                 isSelected
                   ? 'ring-4 ring-amber-500 ring-offset-2 ring-offset-white/80 rounded-2xl shadow-2xl scale-[1.02]'
+                  : isInteractiveSelected
+                  ? 'ring-4 ring-amber-400 ring-offset-2 ring-offset-white/80 rounded-2xl shadow-xl scale-[1.03]'
                   : isDecoratingMode
                   ? 'hover:scale-105 hover:ring-2 hover:ring-amber-300 rounded-xl'
                   : 'hover:scale-103'
@@ -993,7 +1018,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
                 top: `${placed.y}%`,
                 transform: `translate(-50%, -50%) rotate(${placed.rotation}deg) scale(${placed.scale})`,
                 transformOrigin: 'center center',
-                zIndex: isSelected ? 99 : placed.zIndex || 10
+                zIndex: isSelected || isInteractiveSelected ? 99 : placed.zIndex || 10
               }}
             >
               {/* Item Visual Rendering using MiniatureFurnitureRenderer */}
@@ -1047,44 +1072,6 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           </div>
         )}
 
-        {/* 🎮 Contextual Furniture Action Pill Menu (Play Mode) */}
-        {activeFurnitureMenu && !isDecoratingMode && (
-          <div
-            className="absolute z-50 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-300 p-2.5 flex flex-col gap-1.5 transition-all -translate-x-1/2 animate-in fade-in zoom-in-95 min-w-36"
-            style={{
-              left: `${activeFurnitureMenu.x}%`,
-              top: `${Math.max(10, activeFurnitureMenu.y - 24)}%`
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-stone-100 pb-1 px-1">
-              <span className="text-[11px] font-bold text-amber-950 truncate max-w-[120px]">
-                {activeFurnitureMenu.item.name}
-              </span>
-              <button
-                onClick={() => setActiveFurnitureMenu(null)}
-                className="text-stone-400 hover:text-stone-700"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex flex-col gap-1.5 pt-1">
-              {getItemActions(activeFurnitureMenu.item).map((actObj) => (
-                <button
-                  key={actObj.action + actObj.label}
-                  onClick={() => handlePerformAction(actObj.action, activeFurnitureMenu.instanceId)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 font-extrabold text-xs transition-colors cursor-pointer text-left shadow-2xs active:scale-95 min-h-[38px]"
-                >
-                  <span className="text-base">{actObj.icon}</span>
-                  <span className="truncate">{actObj.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* 🛠️ Contextual Collision-Free Decorate Control Panel (Mobile Sheet + Desktop Clamped Floating Toolbar) */}
         {selectedPlacedItem && selectedItemDef && isDecoratingMode && (
           <DecorateControlPanel
@@ -1132,6 +1119,25 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           </div>
         )}
       </div>
+
+      {/* 🎮 Persistent Player-to-Item Interaction Panel (Play Mode) */}
+      {selectedInteractiveObject &&
+        activeSelectedInteractivePlaced &&
+        activeSelectedInteractiveDef &&
+        !isDecoratingMode && (
+          <PlayInteractionPanel
+            selectedObject={{
+              instanceId: selectedInteractiveObject.instanceId,
+              placed: activeSelectedInteractivePlaced,
+              item: activeSelectedInteractiveDef
+            }}
+            actions={getItemActions(activeSelectedInteractiveDef)}
+            onPerformAction={(action) =>
+              handlePerformAction(action, selectedInteractiveObject.instanceId)
+            }
+            onClose={() => setSelectedInteractiveObject(null)}
+          />
+        )}
 
       {/* --- POPUP DIALOGS FOR INTERACTIVE STATIONS --- */}
 

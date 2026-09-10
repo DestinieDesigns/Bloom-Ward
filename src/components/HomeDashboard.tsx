@@ -31,6 +31,7 @@ import { sound } from '../utils/audio';
 import { triggerCelebrationConfetti, triggerSparkleConfetti } from '../utils/storage';
 import { DailyTracker } from './DailyTracker';
 import { TodayWordsCarousel } from './home/TodayWordsCarousel';
+import { TodaysThreeWordsSection } from './home/TodaysThreeWordsSection';
 import { WordOfTheDayCard } from './home/WordOfTheDayCard';
 
 interface HomeDashboardProps {
@@ -393,14 +394,15 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* 🧠 TODAY'S WORDS: INTERACTIVE FLASHCARD CAROUSEL / SLIDE DECK */}
-      <TodayWordsCarousel
+      {/* 🧠 TODAY'S 3 WORDS: INTERACTIVE VOCABULARY SYSTEM */}
+      <TodaysThreeWordsSection
         vocabWords={vocabWords}
         profile={profile}
         onUpdateWordScore={onUpdateWordScore}
         onAddNewWord={onAddNewWord}
         onAddXp={onAddXp}
         onOpenPractice={() => onSelectSection('practice')}
+        onOpenFlashcards={() => onSelectSection('flashcards')}
         onExploreFullLibrary={() => onSelectSection('learn')}
         themeIcon={theme.icon || '🧠'}
       />

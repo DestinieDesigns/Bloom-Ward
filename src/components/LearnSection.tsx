@@ -36,6 +36,7 @@ import { getThemeConfig } from '../data/themes';
 import { getMasteryIcon, getMasteryLabel } from '../utils/adaptive';
 import { getSyllables, getMemoryTip } from '../utils/dailyLearningHelper';
 import { TodayWordsCarousel } from './home/TodayWordsCarousel';
+import { TodaysThreeWordsSection } from './home/TodaysThreeWordsSection';
 import { WordOfTheDayCard } from './home/WordOfTheDayCard';
 
 interface LearnSectionProps {
@@ -407,15 +408,15 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         </div>
       </section>
 
-      {/* 3. TODAY'S WORDS: INTERACTIVE FLASHCARD CAROUSEL / SLIDE DECK */}
-      <TodayWordsCarousel
+      {/* 3. TODAY'S 3 WORDS: INTERACTIVE VOCABULARY SYSTEM */}
+      <TodaysThreeWordsSection
         vocabWords={vocabWords}
         profile={profile}
         onUpdateWordScore={onUpdateWordScore}
         onAddNewWord={onAddNewWord}
         onAddXp={onAddXp}
         onOpenPractice={() => onSelectSection('practice')}
-        onOpenWordDetail={handleOpenWordDetail}
+        onOpenFlashcards={() => onSelectSection('flashcards')}
         onExploreFullLibrary={() => setShowFullLibrary((prev) => !prev)}
         themeIcon={theme.icon || '🧠'}
       />

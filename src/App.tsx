@@ -41,6 +41,7 @@ import {
   triggerSparkleConfetti
 } from './utils/storage';
 import { getAdaptiveDailyWords } from './utils/adaptive';
+import { getOrAssignDaily3Words } from './services/dailyWordsService';
 import { sound } from './utils/audio';
 import { getThemeConfig } from './data/themes';
 import { getTodayActivity } from './utils/dailyLearningHelper';
@@ -239,8 +240,31 @@ function MainAppContent() {
     saveGardenPets(gardenPets);
   }, [gardenPets]);
 
-  // Derived Daily Words & Daily Bible Word
-  const dailyWords = getAdaptiveDailyWords(words, 4);
+  // Automatically assign and derive Today's 3 Words
+  const dailyThreeResult = getOrAssignDaily3Words(words);
+  const dailyWords = dailyThreeResult.dailyWords.length > 0
+    ? dailyThreeResult.dailyWords
+    : getAdaptiveDailyWords(words, 3);
+
+  // Automatically integrate newly assigned Daily 3 words into the learner's vocabulary state
+  useEffect(() => {
+    if (dailyThreeResult.newWordsAddedToVocab.length > 0) {
+      setWords((prev) => {
+        const next = [...prev];
+        let hasChanges = false;
+        dailyThreeResult.newWordsAddedToVocab.forEach((nw) => {
+          const exists = next.some(
+            (w) => w.id === nw.id || w.word.trim().toLowerCase() === nw.word.trim().toLowerCase()
+          );
+          if (!exists) {
+            next.unshift(nw);
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? next : prev;
+      });
+    }
+  }, [dailyThreeResult.newWordsAddedToVocab]);
   const dailyBibleWord = bibleWords[0] || {
     id: 'shalom',
     word: 'Shalom',
