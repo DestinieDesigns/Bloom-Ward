@@ -38,7 +38,12 @@ const ACTION_LABELS: Record<FurnitureActionType, { label: string; icon: string }
   feed: { label: 'Give Tasty Treat', icon: '🥕' },
   hop: { label: 'Happy Hop', icon: '🐇' },
   talk: { label: 'Wise Chat', icon: '🦉' },
-  fly: { label: 'Fly to Perch', icon: '🪶' }
+  fly: { label: 'Fly to Perch', icon: '🪶' },
+  write: { label: 'Write & Journal', icon: '✍️' },
+  study: { label: 'Focus & Study', icon: '📝' },
+  practice: { label: 'Spelling Practice', icon: '🎯' },
+  scripture: { label: 'Read Scripture', icon: '🕊️' },
+  reflect: { label: 'Mindful Reflection', icon: '🙏' }
 };
 
 export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({

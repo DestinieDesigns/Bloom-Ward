@@ -112,7 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       label: navLabels.home,
       icon: theme.icon || '🏡',
       description: 'Cozy room, characters & rewards',
-      matches: ['my_home', 'learning_home', 'sticker_book']
+      matches: ['my_home', 'learning_home', 'sticker_book', 'explore', 'shop']
     }
   ];
 

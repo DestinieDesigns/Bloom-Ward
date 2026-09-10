@@ -1,5 +1,5 @@
 import React from 'react';
-import { HomeItem } from '../../types';
+import { HomeItem, CharacterState } from '../../types';
 import { MiniatureAnimalRenderer } from './MiniatureAnimalRenderer';
 import { MiniaturePlantRenderer } from './MiniaturePlantRenderer';
 
@@ -9,6 +9,7 @@ interface MiniatureFurnitureRendererProps {
   state?: string;
   isLit?: boolean;
   className?: string;
+  sleepingCharacter?: CharacterState;
 }
 
 /**
@@ -22,7 +23,8 @@ export const MiniatureFurnitureRenderer: React.FC<MiniatureFurnitureRendererProp
   size = 'md',
   state,
   isLit = true,
-  className = ''
+  className = '',
+  sleepingCharacter
 }) => {
   const renderKey = item.renderType || item.id;
   const itemId = item.id.toLowerCase();
@@ -142,6 +144,81 @@ export const MiniatureFurnitureRenderer: React.FC<MiniatureFurnitureRendererProp
               <rect x="38" y="4" width="36" height="18" rx="6" fill="#FFFDF9" stroke="#E2D9CE" strokeWidth="1" />
             </g>
 
+            {/* 😴 Tucked-in Sleeping Character resting peacefully on the pillow */}
+            {sleepingCharacter && (
+              <g id="bed-sleeping-learner" transform="translate(44, 44)">
+                {/* Back hair on pillow */}
+                <ellipse
+                  cx="24"
+                  cy="14"
+                  rx="14"
+                  ry="10"
+                  fill={sleepingCharacter.customization.hairColor || '#4A3525'}
+                />
+                {/* Face on pillow */}
+                <ellipse
+                  cx="24"
+                  cy="14"
+                  rx="13"
+                  ry="12"
+                  fill={sleepingCharacter.customization.skinTone || '#F5CBA7'}
+                />
+                {/* Soft Rosy Cheek */}
+                <circle cx="20" cy="18" r="3.5" fill="#F87171" opacity="0.65" />
+                {/* Closed sleeping eyelashes (◠ ◠) */}
+                <path
+                  d="M 18,13 Q 21,10 24,13"
+                  fill="none"
+                  stroke="#4A3525"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 26,13 Q 29,10 32,13"
+                  fill="none"
+                  stroke="#4A3525"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                {/* Peaceful Resting Smile */}
+                <path
+                  d="M 22,21 Q 25,23 28,21"
+                  fill="none"
+                  stroke="#874D38"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                />
+                {/* Front Hair Bangs */}
+                <path
+                  d="M 14,10 C 18,4 32,4 36,10 C 32,7 26,8 22,7 C 18,8 15,7 14,10 Z"
+                  fill={sleepingCharacter.customization.hairColor || '#4A3525'}
+                />
+                {/* Upper Pajama Torso resting on mattress (covered by quilt below) */}
+                <rect
+                  x="10"
+                  y="24"
+                  width="48"
+                  height="30"
+                  rx="6"
+                  fill={sleepingCharacter.customization.outfitColor || '#EFB6BD'}
+                />
+                {/* Cozy Hand resting above blanket */}
+                <ellipse
+                  cx="32"
+                  cy="28"
+                  rx="11"
+                  ry="5"
+                  fill={sleepingCharacter.customization.outfitColor || '#EFB6BD'}
+                />
+                <circle
+                  cx="42"
+                  cy="28"
+                  r="3.5"
+                  fill={sleepingCharacter.customization.skinTone || '#F5CBA7'}
+                />
+              </g>
+            )}
+
             {/* Quilt & Folded Blanket */}
             {isMessy ? (
               <path
@@ -178,6 +255,15 @@ export const MiniatureFurnitureRenderer: React.FC<MiniatureFurnitureRendererProp
             {/* Front Turned Wooden Legs */}
             <rect x="24" y="112" width="9" height="18" rx="2" fill="#754829" />
             <rect x="127" y="112" width="9" height="18" rx="2" fill="#754829" />
+
+            {/* Peaceful Floating Zzz particles */}
+            {sleepingCharacter && (
+              <g className="animate-pulse">
+                <text x="76" y="38" fill="#818CF8" fontSize="9" fontWeight="bold">z</text>
+                <text x="86" y="30" fill="#6366F1" fontSize="12" fontWeight="extrabold">Z</text>
+                <text x="98" y="22" fill="#4F46E5" fontSize="15" fontWeight="black">Z</text>
+              </g>
+            )}
           </svg>
         </div>
       );

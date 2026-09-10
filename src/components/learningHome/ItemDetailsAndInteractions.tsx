@@ -51,7 +51,12 @@ const ACTION_METADATA: Record<
   feed: { label: 'Give Tasty Treat', icon: '🥕', desc: 'Crunchy healthy reward' },
   hop: { label: 'Happy Hop', icon: '🐇', desc: 'Bouncing with joy' },
   talk: { label: 'Wise Chat', icon: '🦉', desc: 'Thoughtful encouraging wisdom' },
-  fly: { label: 'Fly to Perch', icon: '🪶', desc: 'Fluttering gracefully' }
+  fly: { label: 'Fly to Perch', icon: '🪶', desc: 'Fluttering gracefully' },
+  write: { label: 'Write & Journal', icon: '✍️', desc: 'Jotting thoughtful notes and ideas' },
+  study: { label: 'Focus & Study', icon: '📝', desc: 'Deep-dive vocabulary and learning session' },
+  practice: { label: 'Spelling Practice', icon: '🎯', desc: 'Mastering spelling words and challenges' },
+  scripture: { label: 'Read Scripture', icon: '🕊️', desc: 'Opening heartwarming faith verses' },
+  reflect: { label: 'Mindful Reflection', icon: '🙏', desc: 'Quiet peaceful prayer and gratitude' }
 };
 
 export const ItemDetailsAndInteractions: React.FC<ItemDetailsAndInteractionsProps> = ({

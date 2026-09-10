@@ -384,6 +384,11 @@ export type FurnitureActionType =
   | 'sleep'
   | 'relax'
   | 'read'
+  | 'study'
+  | 'practice'
+  | 'write'
+  | 'scripture'
+  | 'reflect'
   | 'messBed'
   | 'makeBed'
   | 'turnOn'
@@ -407,13 +412,82 @@ export type FurnitureActionType =
 
 export interface CharacterCustomization {
   skinTone: string; // Hex color or palette id
-  hairStyle: 'cozy_bun' | 'short_waves' | 'curls' | 'ponytail' | 'braids' | 'beanie';
+  hairStyle: string;
   hairColor: string;
-  outfitColor: string;
-  accessory?: 'reading_glasses' | 'flower_clip' | 'star_badge' | 'none';
+  outfitColor?: string; // Legacy fallback
+  accessory?: string; // Legacy fallback
+  // Wardrobe modular layers
+  topId?: string;
+  bottomId?: string;
+  dressId?: string;
+  outerwearId?: string;
+  sleepwearId?: string;
+  shoesId?: string;
+  accessoryId?: string;
+  headwearId?: string;
+  eyewearId?: string;
+  heldItemId?: string;
+  expression?: 'happy' | 'calm' | 'proud' | 'curious' | 'sleepy' | 'thinking';
+  savedOutfitName?: string;
 }
 
-export type CharacterAnimationState = 'idle' | 'walking' | 'sitting' | 'reading' | 'sleeping' | 'watering';
+export type CharacterAnimationState =
+  | 'idle'
+  | 'walking'
+  | 'sitting'
+  | 'reading'
+  | 'sleeping'
+  | 'watering'
+  | 'studying'
+  | 'writing'
+  | 'relaxing'
+  | 'celebrating';
+
+export type WardrobeCategory =
+  | 'hair'
+  | 'tops'
+  | 'bottoms'
+  | 'dresses'
+  | 'outerwear'
+  | 'sleepwear'
+  | 'shoes'
+  | 'accessories'
+  | 'headwear'
+  | 'eyewear';
+
+export interface WardrobeItem {
+  id: string;
+  name: string;
+  category: WardrobeCategory;
+  collection: string;
+  icon: string;
+  color?: string;
+  secondaryColor?: string;
+  renderKey: string;
+  description: string;
+  unlocked: boolean;
+  unlockRequirement: string;
+  price?: number;
+  rewardType?: 'starter' | 'coins' | 'words_mastered' | 'reading_days' | 'bible_learning' | 'streak' | 'achievement';
+}
+
+export interface SavedOutfit {
+  id: string;
+  name: string;
+  icon: string;
+  customization: CharacterCustomization;
+  createdAt?: string;
+}
+
+export interface FurnitureInteractionAnchor {
+  action: FurnitureActionType;
+  offsetX: number; // percentage offset relative to furniture center
+  offsetY: number; // percentage offset relative to furniture center
+  pose: CharacterAnimationState;
+  facing?: 'left' | 'right';
+  zIndexOffset?: number;
+  embedInBed?: boolean;
+}
 
 export interface CharacterState {
   x: number;
@@ -422,6 +496,7 @@ export interface CharacterState {
   animation: CharacterAnimationState;
   customization: CharacterCustomization;
   currentInteractingItemId?: string | null;
+  activeAnchorAction?: FurnitureActionType | null;
 }
 
 export type HomeRoomId =
@@ -586,6 +661,8 @@ export type AppSection =
   | 'my_home'
   | 'home'
   | 'learning_home'
+  | 'explore'
+  | 'shop'
   | 'sticker_book'
   | 'starting_assessment'
   | 'daily_tracker'

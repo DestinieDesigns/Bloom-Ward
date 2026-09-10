@@ -29,6 +29,7 @@ import { DecorateControlPanel } from './DecorateControlPanel';
 import { PlayInteractionPanel, SelectedInteractiveObject } from './PlayInteractionPanel';
 import { sound } from '../../utils/audio';
 import { getThemeConfig } from '../../data/themes';
+import { getFurnitureInteractionAnchor } from '../../services/interactionAnchorService';
 
 interface RoomCanvasProps {
   room: HomeRoom;
@@ -42,6 +43,7 @@ interface RoomCanvasProps {
   themeId?: ThemeId;
   onUndo?: () => void;
   canUndo?: boolean;
+  onOpenWardrobe?: () => void;
 }
 
 export const RoomCanvas: React.FC<RoomCanvasProps> = ({
@@ -55,7 +57,8 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   onUpdateCharacter,
   themeId,
   onUndo,
-  canUndo
+  canUndo,
+  onOpenWardrobe
 }) => {
   const activeTheme = getThemeConfig(themeId || (room.theme as ThemeId));
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
@@ -340,24 +343,45 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       return [
         { action: 'sit', label: 'Sit', icon: '🪑' },
         { action: 'sleep', label: 'Sleep', icon: '😴' },
-        { action: 'messBed', label: 'Mess Up Bed', icon: '🤪' },
         { action: 'makeBed', label: 'Make Bed', icon: '✨' }
       ];
     }
 
     // 🛋️ Chairs & Sofas
     if (id.includes('chair') || id.includes('sofa') || id.includes('cushion') || id.includes('armchair') || name.includes('chair') || name.includes('sofa')) {
+      const isReadingChair = id.includes('read') || name.includes('read') || id.includes('armchair');
       return [
         { action: 'sit', label: 'Sit', icon: '🪑' },
-        { action: 'sit', label: 'Relax', icon: '☕' }
+        isReadingChair
+          ? { action: 'read', label: 'Read', icon: '📖' }
+          : { action: 'relax', label: 'Relax', icon: '☕' }
       ];
     }
 
-    // 📚 Bookshelves & Desks
-    if (id.includes('book') || id.includes('shelf') || id.includes('desk') || name.includes('book') || name.includes('shelf') || name.includes('desk')) {
+    // 📝 Desks & Study Workspaces
+    if (id.includes('desk') || name.includes('desk') || id.includes('study_table')) {
       return [
+        { action: 'study', label: 'Study', icon: '📝' },
+        { action: 'practice', label: 'Practice', icon: '🎯' },
+        { action: 'write', label: 'Write', icon: '✍️' }
+      ];
+    }
+
+    // 📚 Bookshelves & Bookcases
+    if (id.includes('book') || id.includes('shelf') || name.includes('book') || name.includes('shelf')) {
+      return [
+        { action: 'read', label: 'Read', icon: '📖' },
         { action: 'browseBooks', label: 'Browse Books', icon: '📚' },
-        { action: 'read', label: 'Read', icon: '📖' }
+        { action: 'write', label: 'Add a Word', icon: '✨' }
+      ];
+    }
+
+    // 🕊️ Faith & Scripture Corner
+    if (id.includes('faith') || id.includes('scripture') || id.includes('bible') || name.includes('faith') || name.includes('scripture') || name.includes('bible')) {
+      return [
+        { action: 'scripture', label: 'Scripture', icon: '🕊️' },
+        { action: 'reflect', label: 'Reflect', icon: '🙏' },
+        { action: 'read', label: 'Bible Words', icon: '📖' }
       ];
     }
 
@@ -382,6 +406,24 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       return [
         { action: 'openDoor', label: 'Open Door', icon: '🚪' },
         { action: 'closeDoor', label: 'Close Door', icon: '🔒' }
+      ];
+    }
+
+    // 🗄️ Dresser, Closet, Wardrobe, Vanity & Mirror
+    if (
+      id.includes('dresser') ||
+      id.includes('closet') ||
+      id.includes('wardrobe') ||
+      id.includes('mirror') ||
+      id.includes('vanity') ||
+      name.includes('dresser') ||
+      name.includes('closet') ||
+      name.includes('wardrobe') ||
+      name.includes('mirror')
+    ) {
+      return [
+        { action: 'changeOutfit' as any, label: 'Change Outfit', icon: '🪞' },
+        { action: 'sit', label: 'Tidy Wardrobe', icon: '✨' }
       ];
     }
 
@@ -512,6 +554,24 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     });
   };
 
+  // Wake Up helper for sleeping character
+  const handleWakeUp = (placedBed?: PlacedHomeItem) => {
+    sound.playSuccessChime();
+    if (!character || !onUpdateCharacter) return;
+    const targetX = placedBed ? Math.max(12, placedBed.x - 14) : Math.max(10, character.x - 10);
+    const targetY = placedBed ? Math.min(84, placedBed.y + 4) : character.y;
+    onUpdateCharacter({
+      ...character,
+      x: targetX,
+      y: targetY,
+      animation: 'idle',
+      currentInteractingItemId: null,
+      facing: 'right'
+    });
+    setCharacterBubble("Good morning! Ready for today's words! ☀️");
+    setTimeout(() => setCharacterBubble(null), 3000);
+  };
+
   // Perform furniture/animal/plant specific action
   const handlePerformAction = (action: FurnitureActionType, instanceId: string) => {
     sound.playPop();
@@ -519,6 +579,21 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     if (!placed) return;
     const itemDef = itemMap.current.get(placed.itemId);
     const itemName = itemDef?.name || 'Cozy Item';
+
+    // 0. WARDROBE & OUTFIT CHANGE
+    if ((action as string) === 'changeOutfit') {
+      sound.playSuccessChime();
+      if (onOpenWardrobe) {
+        onOpenWardrobe();
+      }
+      return;
+    }
+
+    // 0B. WAKE UP
+    if ((action as string) === 'wakeUp') {
+      handleWakeUp(placed);
+      return;
+    }
 
     // 1. PET
     if (action === 'pet') {
@@ -576,8 +651,16 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           setCharacterBubble(null);
         }, 4000);
       } else {
-        if (character && onUpdateCharacter) {
-          onUpdateCharacter({ ...character, animation: 'sleeping' });
+        if (character && onUpdateCharacter && itemDef) {
+          const anchor = getFurnitureInteractionAnchor(itemDef, 'sleep');
+          onUpdateCharacter({
+            ...character,
+            x: placed.x + anchor.offsetX,
+            y: placed.y + anchor.offsetY,
+            animation: 'sleeping',
+            currentInteractingItemId: placed.instanceId,
+            facing: anchor.facing || 'right'
+          });
           setCharacterBubble('Nap time in the cozy bed! 💤');
           setTimeout(() => setCharacterBubble(null), 3500);
         }
@@ -691,8 +774,16 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
       );
       onUpdatePlacedItems(updated);
 
-      if (character && onUpdateCharacter) {
-        onUpdateCharacter({ ...character, animation: 'watering' });
+      if (character && onUpdateCharacter && itemDef) {
+        const anchor = getFurnitureInteractionAnchor(itemDef, 'waterPlant');
+        onUpdateCharacter({
+          ...character,
+          x: Math.max(10, Math.min(90, placed.x + anchor.offsetX)),
+          y: Math.max(15, Math.min(85, placed.y + anchor.offsetY)),
+          animation: 'watering',
+          currentInteractingItemId: placed.instanceId,
+          facing: anchor.facing || 'right'
+        });
         setCharacterBubble(`Watered ${itemName} with love! 💧`);
         setTimeout(() => {
           onUpdateCharacter({ ...character, animation: 'idle' });
@@ -706,6 +797,17 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
         p.instanceId === instanceId ? { ...p, state: 'observed' } : p
       );
       onUpdatePlacedItems(updated);
+      if (character && onUpdateCharacter && itemDef) {
+        const anchor = getFurnitureInteractionAnchor(itemDef, 'observePlant');
+        onUpdateCharacter({
+          ...character,
+          x: Math.max(10, Math.min(90, placed.x + anchor.offsetX)),
+          y: Math.max(15, Math.min(85, placed.y + anchor.offsetY)),
+          animation: 'celebrating',
+          currentInteractingItemId: placed.instanceId,
+          facing: anchor.facing || 'right'
+        });
+      }
       setCharacterBubble(`Observing ${itemName}: Vibrant and thriving! 🌱`);
       setTimeout(() => {
         const reset = room.placedItems.map((p) =>
@@ -715,20 +817,101 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
         setCharacterBubble(null);
       }, 3000);
     }
-    // 12. SIT
-    else if (action === 'sit') {
-      if (character && onUpdateCharacter) {
-        onUpdateCharacter({ ...character, animation: 'sitting' });
-        setCharacterBubble(`So comfortable and cozy on ${itemName}! 🪑`);
+    // 12. SIT / RELAX
+    else if (action === 'sit' || action === 'relax') {
+      if (character && onUpdateCharacter && itemDef) {
+        const anchor = getFurnitureInteractionAnchor(itemDef, action);
+        onUpdateCharacter({
+          ...character,
+          x: Math.max(10, Math.min(90, placed.x + anchor.offsetX)),
+          y: Math.max(15, Math.min(85, placed.y + anchor.offsetY)),
+          animation: anchor.pose,
+          currentInteractingItemId: placed.instanceId,
+          facing: anchor.facing || 'right'
+        });
+        setCharacterBubble(
+          action === 'relax'
+            ? `A cozy warm moment with tea on ${itemName}! ☕`
+            : `So comfortable and cozy on ${itemName}! 🪑`
+        );
         setTimeout(() => setCharacterBubble(null), 2500);
       }
     }
     // 13. READ / BROWSE BOOKS
     else if (action === 'read' || action === 'browseBooks') {
-      if (character && onUpdateCharacter) {
-        onUpdateCharacter({ ...character, animation: 'reading' });
+      if (character && onUpdateCharacter && itemDef) {
+        const anchor = getFurnitureInteractionAnchor(itemDef, 'read');
+        onUpdateCharacter({
+          ...character,
+          x: Math.max(10, Math.min(90, placed.x + anchor.offsetX)),
+          y: Math.max(15, Math.min(85, placed.y + anchor.offsetY)),
+          animation: 'reading',
+          currentInteractingItemId: placed.instanceId,
+          facing: anchor.facing || 'right'
+        });
         setCharacterBubble('Reading a lovely chapter! 📖');
         setTimeout(() => setCharacterBubble(null), 3000);
+      }
+    }
+    // 13B. STUDY (Desk)
+    else if (action === 'study') {
+      sound.playSuccessChime();
+      if (character && onUpdateCharacter && itemDef) {
+        const anchor = getFurnitureInteractionAnchor(itemDef, 'study');
+        onUpdateCharacter({
+          ...character,
+          x: Math.max(10, Math.min(90, placed.x + anchor.offsetX)),
+          y: Math.max(15, Math.min(85, placed.y + anchor.offsetY)),
+          animation: 'studying',
+          currentInteractingItemId: placed.instanceId,
+          facing: anchor.facing || 'right'
+        });
+        setCharacterBubble(`Focusing on today's vocabulary at ${itemName}! 📝`);
+        setTimeout(() => {
+          onUpdateCharacter({ ...character, animation: 'idle' });
+          setCharacterBubble(null);
+          if (onSelectSection) onSelectSection('learn');
+        }, 2500);
+      }
+    }
+    // 13C. PRACTICE (Desk)
+    else if (action === 'practice') {
+      sound.playSuccessChime();
+      if (character && onUpdateCharacter) {
+        onUpdateCharacter({ ...character, animation: 'reading' });
+        setCharacterBubble(`Starting spelling and word practice! 🎯`);
+        setTimeout(() => {
+          onUpdateCharacter({ ...character, animation: 'idle' });
+          setCharacterBubble(null);
+          if (onSelectSection) onSelectSection('practice');
+        }, 2500);
+      }
+    }
+    // 13D. WRITE (Notebook / Journal)
+    else if (action === 'write') {
+      sound.playSuccessChime();
+      setCharacterBubble(`Noting down wonderful words in the journal! ✍️`);
+      setTimeout(() => {
+        setCharacterBubble(null);
+        if (onSelectSection) onSelectSection('dictionary');
+      }, 2500);
+    }
+    // 13E. SCRIPTURE
+    else if (action === 'scripture') {
+      sound.playBloomSparkle();
+      setCharacterBubble(`"Thy word is a lamp unto my feet, and a light unto my path." 🕊️`);
+      setTimeout(() => setCharacterBubble(null), 3500);
+    }
+    // 13F. REFLECT
+    else if (action === 'reflect') {
+      sound.playSuccessChime();
+      if (character && onUpdateCharacter) {
+        onUpdateCharacter({ ...character, animation: 'sitting' });
+        setCharacterBubble(`Peace, gratitude, and quiet reflection... 🙏`);
+        setTimeout(() => {
+          onUpdateCharacter({ ...character, animation: 'idle' });
+          setCharacterBubble(null);
+        }, 3000);
       }
     }
     // 14. BED TIDY / MESSY
@@ -963,6 +1146,19 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           {/* Window Frame Panes */}
           <div className="w-full h-0.5 bg-white/70 absolute top-1/2" />
           <div className="h-full w-0.5 bg-white/70 absolute left-1/2" />
+
+          {/* Swaying Curtains on Window Panes */}
+          <div className="absolute -left-1.5 top-0 bottom-0 w-3.5 sm:w-5 bg-white/80 rounded-r-md shadow-xs animate-pulse duration-3000 pointer-events-none" />
+          <div className="absolute -right-1.5 top-0 bottom-0 w-3.5 sm:w-5 bg-white/80 rounded-l-md shadow-xs animate-pulse duration-3000 pointer-events-none" />
+        </div>
+
+        {/* ☀️ Warm Golden Sunbeams Streaming from Window onto Floor */}
+        <div className="absolute top-12 right-6 sm:right-12 w-64 sm:w-96 h-80 sm:h-96 bg-gradient-to-bl from-amber-200/30 via-amber-100/10 to-transparent pointer-events-none z-2 rotate-[-20deg] origin-top-right mix-blend-screen overflow-hidden">
+          {/* Drifting subtle golden sparkle particles in sunlight */}
+          <div className="absolute top-10 left-16 w-1.5 h-1.5 rounded-full bg-amber-100/90 animate-ping duration-3000" />
+          <div className="absolute top-24 left-32 w-1 h-1 rounded-full bg-white/95 animate-pulse duration-2500" />
+          <div className="absolute top-40 left-12 w-1.5 h-1.5 rounded-full bg-amber-200/90 animate-pulse duration-4000" />
+          <div className="absolute top-52 left-24 w-1 h-1 rounded-full bg-white/80 animate-ping duration-3500" />
         </div>
 
         {/* Left & Right Corner Shadow Depths */}
@@ -1023,20 +1219,47 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
             >
               {/* Item Visual Rendering using MiniatureFurnitureRenderer */}
               <div className="relative group">
-                {isSticker ? (
-                  <span className="block text-4xl sm:text-6xl drop-shadow-md select-none">
-                    {itemDef.icon}
-                  </span>
-                ) : (
-                  <div className="select-none pointer-events-none">
-                    <MiniatureFurnitureRenderer
-                      item={itemDef}
-                      state={placed.state}
-                      isLit={placed.state !== 'turned_off'}
-                      size="md"
-                    />
-                  </div>
-                )}
+                {(() => {
+                  const isCharacterInThisBed =
+                    (itemDef.id.includes('bed') || (itemDef.renderType || '').includes('bed')) &&
+                    character?.animation === 'sleeping' &&
+                    character.currentInteractingItemId === placed.instanceId;
+
+                  return (
+                    <>
+                      {isSticker ? (
+                        <span className="block text-4xl sm:text-6xl drop-shadow-md select-none">
+                          {itemDef.icon}
+                        </span>
+                      ) : (
+                        <div className="select-none pointer-events-none">
+                          <MiniatureFurnitureRenderer
+                            item={itemDef}
+                            state={placed.state}
+                            isLit={placed.state !== 'turned_off'}
+                            size="md"
+                            sleepingCharacter={isCharacterInThisBed ? character : undefined}
+                          />
+                        </div>
+                      )}
+
+                      {/* ☀️ Wake Up button hovering directly over bed when character is sleeping inside */}
+                      {isCharacterInThisBed && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleWakeUp(placed);
+                          }}
+                          className="absolute -top-7 left-1/2 -translate-x-1/2 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs px-3.5 py-1 rounded-full shadow-lg border border-amber-200 cursor-pointer animate-bounce z-40 whitespace-nowrap flex items-center gap-1.5 transition-transform active:scale-95"
+                          title="Click to wake up your character"
+                        >
+                          <span>☀️</span>
+                          <span>Wake Up</span>
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Play mode subtle hover tag */}
                 {!isDecoratingMode && (
@@ -1050,7 +1273,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
         })}
 
         {/* 👤 Live Customizable Miniature Character */}
-        {character && (
+        {character && (!character.currentInteractingItemId || character.animation !== 'sleeping') && (
           <div
             id="home-mini-character"
             className="absolute transition-all duration-500 ease-out z-30"

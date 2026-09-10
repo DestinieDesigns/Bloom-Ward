@@ -66,6 +66,7 @@ import { FlashcardCenter } from './components/FlashcardCenter';
 import { TrueSpellingTest } from './components/TrueSpellingTest';
 import { DiscoverLearningPath } from './components/DiscoverLearningPath';
 import { LearningHome } from './components/LearningHome';
+import { WorldExplorer } from './components/world/WorldExplorer';
 import { LearnSection } from './components/LearnSection';
 import { PracticeSection } from './components/PracticeSection';
 import { TestSection } from './components/TestSection';
@@ -863,6 +864,26 @@ function MainAppContent() {
                 profile={activeProfile}
                 words={words}
                 readingSessions={readingSessions}
+                onSelectSection={handleNavigateSection}
+                onUpdateProfile={updateActiveProfile}
+              />
+            )}
+
+            {/* 6. WORLD EXPLORATION (Connected World Map) */}
+            {activeSection === 'explore' && (
+              <WorldExplorer
+                profile={activeProfile}
+                onSelectSection={handleNavigateSection}
+              />
+            )}
+
+            {/* 7. WORLD BOUTIQUE & SHOP */}
+            {activeSection === 'shop' && (
+              <LearningHome
+                profile={activeProfile}
+                words={words}
+                readingSessions={readingSessions}
+                initialMainView="shop"
                 onSelectSection={handleNavigateSection}
                 onUpdateProfile={updateActiveProfile}
               />
