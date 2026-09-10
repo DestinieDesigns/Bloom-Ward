@@ -79,6 +79,7 @@ import { ProfileSelectionScreen } from './components/auth/ProfileSelectionScreen
 import { WelcomeBackScreen } from './components/auth/WelcomeBackScreen';
 import { DiscoveryAssessmentModal } from './components/auth/DiscoveryAssessmentModal';
 import { ParentGateModal } from './components/auth/ParentGateModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 function MainAppContent() {
   const {
@@ -408,17 +409,87 @@ function MainAppContent() {
     );
   };
 
-  // Add a single newly discovered word
+  // Add a newly discovered word or update existing entry without creating duplicates
   const handleAddNewWord = (newWord: VocabWord) => {
-    setWords((prev) => [newWord, ...prev]);
+    const today = new Date().toISOString().split('T')[0];
+    setWords((prev) => {
+      const cleanTarget = newWord.word.trim().toLowerCase();
+      const existingIdx = prev.findIndex((w) => w.word.trim().toLowerCase() === cleanTarget);
+
+      if (existingIdx >= 0) {
+        const existing = prev[existingIdx];
+        const updated: VocabWord = {
+          ...existing,
+          timesSeen: (existing.timesSeen || existing.timesPracticed || 1) + 1,
+          readingOccurrences: (existing.readingOccurrences || 0) + (newWord.sourceType === 'reading' ? 1 : 0),
+          lastSeen: today,
+          lastPracticedDate: existing.lastPracticedDate || today,
+          context: newWord.context || existing.context,
+          contextSentence: newWord.contextSentence || existing.contextSentence,
+          bookTitle: newWord.bookTitle || existing.bookTitle,
+          bookAuthor: newWord.bookAuthor || existing.bookAuthor,
+          bookPage: newWord.bookPage || existing.bookPage,
+          scriptureReference: newWord.scriptureReference || existing.scriptureReference,
+          bibleContext: newWord.bibleContext || existing.bibleContext,
+          isBibleWord: existing.isBibleWord || newWord.isBibleWord,
+          notes: newWord.notes || existing.notes,
+          definition:
+            (existing.definitionUnavailable || !existing.definition || existing.definition.includes('discovered during reading')) &&
+            newWord.definition &&
+            !newWord.definitionUnavailable
+              ? newWord.definition
+              : existing.definition,
+          simpleDefinition: newWord.simpleDefinition || existing.simpleDefinition,
+          simpleMeaning: newWord.simpleMeaning || existing.simpleMeaning || newWord.simpleDefinition,
+          definitionUnavailable:
+            newWord.definitionUnavailable !== undefined
+              ? existing.definitionUnavailable && !newWord.definitionUnavailable
+                ? false
+                : existing.definitionUnavailable
+              : existing.definitionUnavailable,
+          pronunciation: newWord.pronunciation || existing.pronunciation
+        };
+
+        const next = [...prev];
+        next[existingIdx] = updated;
+        return next;
+      }
+
+      return [newWord, ...prev];
+    });
     handleAddXp(20);
     sound.playBloomSparkle();
     triggerCelebrationConfetti();
   };
 
-  // Add multiple homework words
+  // Add multiple homework words without creating duplicate entries
   const handleAddHomeworkWords = (newWords: VocabWord[]) => {
-    setWords((prev) => [...newWords, ...prev]);
+    const today = new Date().toISOString().split('T')[0];
+    setWords((prev) => {
+      let current = [...prev];
+      for (const newWord of newWords) {
+        const cleanTarget = newWord.word.trim().toLowerCase();
+        const existingIdx = current.findIndex((w) => w.word.trim().toLowerCase() === cleanTarget);
+        if (existingIdx >= 0) {
+          const existing = current[existingIdx];
+          current[existingIdx] = {
+            ...existing,
+            timesSeen: (existing.timesSeen || existing.timesPracticed || 1) + 1,
+            lastSeen: today,
+            isHomework: true,
+            homeworkTag: newWord.homeworkTag || existing.homeworkTag,
+            definition:
+              (existing.definitionUnavailable || !existing.definition) && newWord.definition
+                ? newWord.definition
+                : existing.definition,
+            simpleDefinition: newWord.simpleDefinition || existing.simpleDefinition
+          };
+        } else {
+          current = [newWord, ...current];
+        }
+      }
+      return current;
+    });
   };
 
   // Reading Session Completed Handler
@@ -957,6 +1028,9 @@ function MainAppContent() {
           onStartAssessment={() => setActiveSection('starting_assessment')}
         />
       )}
+
+      {/* Offline Connectivity Status Notification */}
+      <OfflineIndicator />
     </div>
   );
 }

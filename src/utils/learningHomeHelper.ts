@@ -29,16 +29,47 @@ export const loadLearningHomeState = (): UserLearningHomeState => {
     const saved = localStorage.getItem(STORAGE_KEYS.HOME_STATE);
     if (saved) {
       const parsed = JSON.parse(saved);
-      const existingUnlocked = parsed.unlockedItemIds || [];
+      const existingUnlocked: string[] = parsed.unlockedItemIds || [];
       const mergedUnlocked = Array.from(new Set([...STARTER_PACK_ITEM_IDS, ...existingUnlocked]));
+      const rooms = {
+        ...INITIAL_ROOMS,
+        ...parsed.rooms
+      };
+
+      // Real Inventory Quantity Tracking & Migration
+      let inventory: Record<string, number> = {};
+
+      if (parsed.inventory && typeof parsed.inventory === 'object') {
+        // Sanitize existing inventory: strictly non-negative integers
+        for (const [itemId, qty] of Object.entries(parsed.inventory)) {
+          inventory[itemId] = Math.max(0, Math.floor(Number(qty) || 0));
+        }
+      } else {
+        // Safe Migration for existing players who only had boolean/array ownership
+        // Calculate items already placed across all rooms
+        const placedCountMap: Record<string, number> = {};
+        for (const room of Object.values(rooms) as HomeRoom[]) {
+          if (room && Array.isArray(room.placedItems)) {
+            for (const item of room.placedItems) {
+              placedCountMap[item.itemId] = (placedCountMap[item.itemId] || 0) + 1;
+            }
+          }
+        }
+
+        // For each previously unlocked or starter item:
+        // If not currently placed, grant 1 available copy in inventory.
+        // If already placed, available inventory is 0 (it will return to inventory if stored).
+        for (const itemId of mergedUnlocked) {
+          const placedCount = placedCountMap[itemId] || 0;
+          inventory[itemId] = placedCount > 0 ? 0 : 1;
+        }
+      }
 
       // Merge with any new default rooms or items in case of updates
       return {
         activeRoomId: parsed.activeRoomId || 'main_room',
-        rooms: {
-          ...INITIAL_ROOMS,
-          ...parsed.rooms
-        },
+        rooms,
+        inventory,
         unlockedItemIds: mergedUnlocked,
         collectedStickerIds: parsed.collectedStickerIds || ['stk-curious-sprout', 'stk-spelling-bee'],
         lastEarnedGift: parsed.lastEarnedGift,
@@ -56,9 +87,17 @@ export const loadLearningHomeState = (): UserLearningHomeState => {
     console.error('Error loading Learning Home state from localStorage:', err);
   }
 
+  // Initial fresh inventory: starter items not placed in main room get 1 copy in inventory
+  const initialPlacedIds = new Set(INITIAL_ROOMS.main_room.placedItems.map((p) => p.itemId));
+  const freshInventory: Record<string, number> = {};
+  for (const itemId of STARTER_PACK_ITEM_IDS) {
+    freshInventory[itemId] = initialPlacedIds.has(itemId) ? 0 : 1;
+  }
+
   return {
     activeRoomId: 'main_room',
     rooms: INITIAL_ROOMS,
+    inventory: freshInventory,
     unlockedItemIds: Array.from(new Set([...STARTER_PACK_ITEM_IDS, ...INITIAL_HOME_ITEMS.filter((i) => i.unlocked).map((i) => i.id)])),
     collectedStickerIds: ['stk-curious-sprout', 'stk-spelling-bee'],
     character: {

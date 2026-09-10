@@ -25,6 +25,7 @@ import {
 import { INITIAL_HOME_ITEMS } from '../../data/learningHomeData';
 import { MiniatureFurnitureRenderer } from './MiniatureFurnitureRenderer';
 import { HomeCharacter } from './HomeCharacter';
+import { DecorateControlPanel } from './DecorateControlPanel';
 import { sound } from '../../utils/audio';
 import { getThemeConfig } from '../../data/themes';
 
@@ -32,22 +33,28 @@ interface RoomCanvasProps {
   room: HomeRoom;
   onUpdatePlacedItems: (items: PlacedHomeItem[]) => void;
   onRemoveItem: (instanceId: string) => void;
+  onStoreItem?: (instanceId: string) => void;
   onSelectSection: (section: AppSection) => void;
   isDecoratingMode: boolean;
   character?: CharacterState;
   onUpdateCharacter?: (c: CharacterState) => void;
   themeId?: ThemeId;
+  onUndo?: () => void;
+  canUndo?: boolean;
 }
 
 export const RoomCanvas: React.FC<RoomCanvasProps> = ({
   room,
   onUpdatePlacedItems,
   onRemoveItem,
+  onStoreItem,
   onSelectSection,
   isDecoratingMode,
   character,
   onUpdateCharacter,
-  themeId
+  themeId,
+  onUndo,
+  canUndo
 }) => {
   const activeTheme = getThemeConfig(themeId || (room.theme as ThemeId));
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
@@ -65,10 +72,48 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     y: number;
   } | null>(null);
   const [characterBubble, setCharacterBubble] = useState<string | null>(null);
+  const [isMovingActive, setIsMovingActive] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const dragStartOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const originalTransformRef = useRef<{
+    instanceId: string;
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    zIndex: number;
+  } | null>(null);
+
+  // Clear or capture initial transform when selected item changes
+  useEffect(() => {
+    if (!selectedInstanceId) {
+      originalTransformRef.current = null;
+      setIsMovingActive(false);
+      return;
+    }
+    const current = room.placedItems.find((p) => p.instanceId === selectedInstanceId);
+    if (current && (!originalTransformRef.current || originalTransformRef.current.instanceId !== selectedInstanceId)) {
+      originalTransformRef.current = {
+        instanceId: current.instanceId,
+        x: current.x,
+        y: current.y,
+        scale: current.scale,
+        rotation: current.rotation,
+        zIndex: current.zIndex || 10
+      };
+    }
+  }, [selectedInstanceId, room.placedItems]);
+
+  // If exiting decorate mode, clean up selection
+  useEffect(() => {
+    if (!isDecoratingMode) {
+      setSelectedInstanceId(null);
+      setIsMovingActive(false);
+      originalTransformRef.current = null;
+    }
+  }, [isDecoratingMode]);
 
   // Map of item definitions for fast lookup
   const itemMap = useRef<Map<string, HomeItem>>(new Map());
@@ -109,6 +154,17 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     setActiveFurnitureMenu(null);
     isDraggingRef.current = true;
 
+    if (!originalTransformRef.current || originalTransformRef.current.instanceId !== placed.instanceId) {
+      originalTransformRef.current = {
+        instanceId: placed.instanceId,
+        x: placed.x,
+        y: placed.y,
+        scale: placed.scale,
+        rotation: placed.rotation,
+        zIndex: placed.zIndex || 10
+      };
+    }
+
     if (!canvasRef.current) return;
     const canvasRect = canvasRef.current.getBoundingClientRect();
     const itemPixelX = (placed.x / 100) * canvasRect.width;
@@ -142,10 +198,23 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     onUpdatePlacedItems(updated);
   };
 
-  // Walk character towards a location on click
+  // Walk character towards a location on click, or place item in move mode
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (isDecoratingMode) {
-      setSelectedInstanceId(null);
+      if (isMovingActive && selectedInstanceId && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const clickX = Math.max(5, Math.min(95, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+        const clickY = Math.max(10, Math.min(92, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+        const updated = room.placedItems.map((p) =>
+          p.instanceId === selectedInstanceId ? { ...p, x: clickX, y: clickY } : p
+        );
+        onUpdatePlacedItems(updated);
+        sound.playPop();
+        return;
+      }
+      // In Decorate Mode, clicking empty canvas does NOT deselect the object.
+      // The object remains selected until the user presses Done, Cancel, Store,
+      // taps another object, or exits decorate mode.
       return;
     }
 
@@ -723,6 +792,45 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
     onUpdatePlacedItems(updated);
   };
 
+  // Nudge item with fine directional steps
+  const handleNudgeMove = (deltaX: number, deltaY: number) => {
+    if (!selectedInstanceId) return;
+    sound.playPop();
+    const updated = room.placedItems.map((p) => {
+      if (p.instanceId === selectedInstanceId) {
+        const nextX = Math.max(5, Math.min(95, p.x + deltaX));
+        const nextY = Math.max(10, Math.min(92, p.y + deltaY));
+        return { ...p, x: nextX, y: nextY };
+      }
+      return p;
+    });
+    onUpdatePlacedItems(updated);
+  };
+
+  // Revert changes to before this edit session started
+  const handleCancelEdit = () => {
+    if (originalTransformRef.current && selectedInstanceId) {
+      const orig = originalTransformRef.current;
+      const reverted = room.placedItems.map((p) =>
+        p.instanceId === orig.instanceId
+          ? {
+              ...p,
+              x: orig.x,
+              y: orig.y,
+              scale: orig.scale,
+              rotation: orig.rotation,
+              zIndex: orig.zIndex
+            }
+          : p
+      );
+      onUpdatePlacedItems(reverted);
+    }
+    sound.playPop();
+    setSelectedInstanceId(null);
+    setIsMovingActive(false);
+    originalTransformRef.current = null;
+  };
+
   // Check if any lamp is turned on to add warm lighting glow
   const hasActiveLamp = room.placedItems.some((p) => {
     const def = itemMap.current.get(p.itemId);
@@ -871,9 +979,11 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
               key={placed.instanceId}
               id={`home-item-${placed.instanceId}`}
               onPointerDown={(e) => handleItemPointerDown(e, placed, itemDef)}
-              className={`absolute cursor-pointer transition-transform ${
+              className={`absolute cursor-pointer ${
+                isDraggingRef.current && isSelected ? 'transition-none' : 'transition-transform'
+              } ${
                 isSelected
-                  ? 'ring-4 ring-amber-500 ring-offset-2 ring-offset-white/80 rounded-2xl shadow-2xl'
+                  ? 'ring-4 ring-amber-500 ring-offset-2 ring-offset-white/80 rounded-2xl shadow-2xl scale-[1.02]'
                   : isDecoratingMode
                   ? 'hover:scale-105 hover:ring-2 hover:ring-amber-300 rounded-xl'
                   : 'hover:scale-103'
@@ -882,6 +992,7 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
                 left: `${placed.x}%`,
                 top: `${placed.y}%`,
                 transform: `translate(-50%, -50%) rotate(${placed.rotation}deg) scale(${placed.scale})`,
+                transformOrigin: 'center center',
                 zIndex: isSelected ? 99 : placed.zIndex || 10
               }}
             >
@@ -974,74 +1085,38 @@ export const RoomCanvas: React.FC<RoomCanvasProps> = ({
           </div>
         )}
 
-        {/* 🛠️ Floating Decorating Tool Bar for Selected Item */}
+        {/* 🛠️ Contextual Collision-Free Decorate Control Panel (Mobile Sheet + Desktop Clamped Floating Toolbar) */}
         {selectedPlacedItem && selectedItemDef && isDecoratingMode && (
-          <div
-            className="absolute z-50 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-300 p-2 flex items-center gap-1.5 transition-all -translate-x-1/2"
-            style={{
-              left: `${selectedPlacedItem.x}%`,
-              top: `${Math.max(8, selectedPlacedItem.y - 18)}%`
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Rotate */}
-            <button
-              onClick={handleRotate}
-              className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-transform active:scale-90"
-              title="Rotate 90°"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
-
-            {/* Scale Down */}
-            <button
-              onClick={() => handleScaleChange(-0.1)}
-              className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-700 cursor-pointer transition-transform active:scale-90"
-              title="Make Smaller"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </button>
-
-            {/* Scale Up */}
-            <button
-              onClick={() => handleScaleChange(0.1)}
-              className="p-2 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-700 cursor-pointer transition-transform active:scale-90"
-              title="Make Larger"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-
-            {/* Bring to Front */}
-            <button
-              onClick={handleBringForward}
-              className="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 cursor-pointer transition-transform active:scale-90"
-              title="Bring to Front"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
-
-            {/* Remove item back to inventory */}
-            <button
-              onClick={() => {
-                sound.playPop();
+          <DecorateControlPanel
+            placedItem={selectedPlacedItem}
+            itemDef={selectedItemDef}
+            canvasElement={canvasRef.current}
+            onScaleChange={handleScaleChange}
+            onRotate={handleRotate}
+            onNudgeMove={handleNudgeMove}
+            onBringForward={handleBringForward}
+            onStoreItem={() => {
+              sound.playPop();
+              if (onStoreItem) {
+                onStoreItem(selectedPlacedItem.instanceId);
+              } else {
                 onRemoveItem(selectedPlacedItem.instanceId);
-                setSelectedInstanceId(null);
-              }}
-              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer transition-transform active:scale-90"
-              title="Return to Collection"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-
-            {/* Deselect */}
-            <button
-              onClick={() => setSelectedInstanceId(null)}
-              className="p-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer"
-              title="Done"
-            >
-              <Check className="w-4 h-4 text-emerald-600" />
-            </button>
-          </div>
+              }
+              setSelectedInstanceId(null);
+              setIsMovingActive(false);
+              originalTransformRef.current = null;
+            }}
+            onUndo={onUndo || (() => {})}
+            canUndo={!!canUndo}
+            onCancel={handleCancelEdit}
+            onDone={() => {
+              setSelectedInstanceId(null);
+              setIsMovingActive(false);
+              originalTransformRef.current = null;
+            }}
+            isMovingActive={isMovingActive}
+            onToggleMoveActive={() => setIsMovingActive(!isMovingActive)}
+          />
         )}
 
         {/* Empty Room Hint */}

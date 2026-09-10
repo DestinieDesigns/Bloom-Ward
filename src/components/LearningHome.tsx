@@ -100,7 +100,9 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
   const [isDecorateDrawerOpen, setIsDecorateDrawerOpen] = useState<boolean>(false);
 
   // Undo history for room decorating (up to 20 past configurations)
-  const [history, setHistory] = useState<PlacedHomeItem[][]>([]);
+  const [history, setHistory] = useState<
+    Array<{ placedItems: PlacedHomeItem[]; inventory: Record<string, number> }>
+  >([]);
 
   // Sticker Book State
   const [stickers, setStickers] = useState<StickerItem[]>(() => loadStickerBook());
@@ -139,8 +141,11 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
   };
 
   // Push to Undo history before modifying placed items
-  const pushHistory = (items: PlacedHomeItem[]) => {
-    setHistory((prev) => [items, ...prev].slice(0, 20));
+  const pushHistory = (snapshot: {
+    placedItems: PlacedHomeItem[];
+    inventory: Record<string, number>;
+  }) => {
+    setHistory((prev) => [snapshot, ...prev].slice(0, 20));
   };
 
   // Perform Undo
@@ -154,11 +159,12 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
       ...homeState.rooms,
       [homeState.activeRoomId]: {
         ...activeRoom,
-        placedItems: previous
+        placedItems: previous.placedItems
       }
     };
     persistHomeState({
       ...homeState,
+      inventory: previous.inventory,
       rooms: updatedRooms
     });
   };
@@ -177,9 +183,16 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
         ...homeState.unlockedItemIds,
         ...unlockResult.newlyUnlockedItems.map((i) => i.id)
       ];
+      const nextInventory = { ...(homeState.inventory || {}) };
+      for (const item of unlockResult.newlyUnlockedItems) {
+        if ((nextInventory[item.id] || 0) === 0) {
+          nextInventory[item.id] = 1;
+        }
+      }
       const updatedState = {
         ...homeState,
-        unlockedItemIds: updatedUnlocked
+        unlockedItemIds: updatedUnlocked,
+        inventory: nextInventory
       };
       persistHomeState(updatedState);
 
@@ -218,7 +231,10 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
 
   // Update placed items for active room
   const handleUpdatePlacedItems = (placedItems: PlacedHomeItem[]) => {
-    pushHistory(activeRoom.placedItems);
+    pushHistory({
+      placedItems: activeRoom.placedItems,
+      inventory: homeState.inventory || {}
+    });
     const updatedRooms = {
       ...homeState.rooms,
       [homeState.activeRoomId]: {
@@ -274,7 +290,7 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
     });
   };
 
-  // Buy item from boutique shop
+  // Buy item from boutique shop (increments item inventory quantity by 1)
   const handleBuyItem = (item: HomeItem) => {
     const price = item.price ?? 0;
     if (userCoins < price) {
@@ -285,11 +301,18 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
     sound.playSuccessChime();
     const nextCoins = userCoins - price;
     const nextUnlocked = Array.from(new Set([...homeState.unlockedItemIds, item.id]));
+    const currentInventory = homeState.inventory || {};
+    const currentCount = currentInventory[item.id] || 0;
+    const nextInventory: Record<string, number> = {
+      ...currentInventory,
+      [item.id]: currentCount + 1
+    };
 
     const updatedState: UserLearningHomeState = {
       ...homeState,
       learningCoins: nextCoins,
-      unlockedItemIds: nextUnlocked
+      unlockedItemIds: nextUnlocked,
+      inventory: nextInventory
     };
 
     persistHomeState(updatedState);
@@ -301,9 +324,23 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
     }
   };
 
-  // Place item into room
+  // Place item into room (decrements inventory by exactly 1)
   const handlePlaceItem = (item: HomeItem) => {
+    const currentInventory = homeState.inventory || {};
+    const currentCount = currentInventory[item.id] || 0;
+
+    // Must have at least 1 in backpack inventory to place
+    if (currentCount <= 0) {
+      sound.playPop();
+      return;
+    }
+
     sound.playPop();
+    const nextInventory: Record<string, number> = {
+      ...currentInventory,
+      [item.id]: Math.max(0, currentCount - 1)
+    };
+
     const newInstanceId = `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const newItem: PlacedHomeItem = {
       instanceId: newInstanceId,
@@ -316,14 +353,72 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
     };
 
     const updatedPlaced = [...activeRoom.placedItems, newItem];
-    handleUpdatePlacedItems(updatedPlaced);
+    const updatedRooms = {
+      ...homeState.rooms,
+      [homeState.activeRoomId]: {
+        ...activeRoom,
+        placedItems: updatedPlaced
+      }
+    };
+
+    const updatedState: UserLearningHomeState = {
+      ...homeState,
+      inventory: nextInventory,
+      rooms: updatedRooms
+    };
+
+    pushHistory({
+      placedItems: activeRoom.placedItems,
+      inventory: currentInventory
+    });
+    persistHomeState(updatedState);
     setActiveMainView('room');
+
+    setSaveToastVisible(true);
+    setTimeout(() => setSaveToastVisible(false), 2000);
   };
 
-  // Remove item from room
-  const handleRemoveItem = (instanceId: string) => {
+  // Store item: removes from active room and returns exactly 1 copy to backpack inventory
+  const handleStoreItem = (instanceId: string) => {
+    const itemToStore = activeRoom.placedItems.find((p) => p.instanceId === instanceId);
+    if (!itemToStore) return;
+
+    sound.playPop();
+    const currentInventory = homeState.inventory || {};
+    const currentCount = currentInventory[itemToStore.itemId] || 0;
+    const nextInventory: Record<string, number> = {
+      ...currentInventory,
+      [itemToStore.itemId]: currentCount + 1
+    };
+
     const updatedPlaced = activeRoom.placedItems.filter((p) => p.instanceId !== instanceId);
-    handleUpdatePlacedItems(updatedPlaced);
+    const updatedRooms = {
+      ...homeState.rooms,
+      [homeState.activeRoomId]: {
+        ...activeRoom,
+        placedItems: updatedPlaced
+      }
+    };
+
+    const updatedState: UserLearningHomeState = {
+      ...homeState,
+      inventory: nextInventory,
+      rooms: updatedRooms
+    };
+
+    pushHistory({
+      placedItems: activeRoom.placedItems,
+      inventory: currentInventory
+    });
+    persistHomeState(updatedState);
+
+    setSaveToastVisible(true);
+    setTimeout(() => setSaveToastVisible(false), 2000);
+  };
+
+  // Remove item from room (stores back to inventory)
+  const handleRemoveItem = (instanceId: string) => {
+    handleStoreItem(instanceId);
   };
 
   // Handle switching to Decorate Mode
@@ -395,6 +490,20 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
             </span>
           </div>
 
+          {/* 🎒 Backpack / Inventory Collection */}
+          <button
+            id="open-backpack-collection-btn"
+            onClick={() => {
+              sound.playPop();
+              setIsCollectionOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-pink-50 hover:bg-pink-100 text-pink-950 text-xs font-extrabold border border-pink-200 cursor-pointer transition-colors active:scale-95"
+            title="Open Backpack Collection"
+          >
+            <span className="text-base">🎒</span>
+            <span className="hidden sm:inline font-bold">Backpack</span>
+          </button>
+
           {/* 👤 Profile / Avatar Access */}
           <button
             id="open-character-customizer-btn"
@@ -421,6 +530,7 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
           <HomeShop
             userCoins={userCoins}
             unlockedItemIds={homeState.unlockedItemIds}
+            inventory={homeState.inventory || {}}
             onBuyItem={handleBuyItem}
             onPlaceItem={(item) => {
               handlePlaceItem(item);
@@ -442,11 +552,14 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
           room={activeRoom}
           onUpdatePlacedItems={handleUpdatePlacedItems}
           onRemoveItem={handleRemoveItem}
+          onStoreItem={handleStoreItem}
           onSelectSection={onSelectSection}
           isDecoratingMode={isDecoratingMode}
           character={homeState.character}
           onUpdateCharacter={handleUpdateCharacter}
           themeId={profile.theme}
+          onUndo={handleUndo}
+          canUndo={history.length > 0}
         />
       )}
 
@@ -590,11 +703,30 @@ export const LearningHome: React.FC<LearningHomeProps> = ({
         activeTab={decorateTab}
         onClose={() => setIsDecorateDrawerOpen(false)}
         unlockedItemIds={homeState.unlockedItemIds}
+        inventory={homeState.inventory || {}}
         currentRoom={activeRoom}
         onPlaceItem={handlePlaceItem}
         onUpdateRoomStyle={handleUpdateRoomStyle}
         onOpenShop={() => {
           setIsDecorateDrawerOpen(false);
+          setActiveMainView('shop');
+        }}
+      />
+
+      {/* 🎒 Collection / Backpack Drawer */}
+      <CollectionDrawer
+        isOpen={isCollectionOpen}
+        onClose={() => setIsCollectionOpen(false)}
+        unlockedItemIds={homeState.unlockedItemIds}
+        inventory={homeState.inventory || {}}
+        placedItems={activeRoom.placedItems}
+        onPlaceItem={(item) => {
+          handlePlaceItem(item);
+          setIsCollectionOpen(false);
+          setIsDecoratingMode(true);
+        }}
+        onOpenShop={() => {
+          setIsCollectionOpen(false);
           setActiveMainView('shop');
         }}
       />

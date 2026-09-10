@@ -26,9 +26,12 @@ export interface VocabWord {
   id: string;
   word: string;
   definition: string;
+  simpleDefinition?: string;
+  simpleMeaning?: string;
   pronunciation: string;
-  partOfSpeech: 'noun' | 'verb' | 'adjective' | 'adverb';
+  partOfSpeech: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
   exampleSentence: string;
+  example?: string;
   synonyms: string[];
   antonyms?: string[];
   difficulty: 'easy' | 'medium' | 'challenging';
@@ -45,13 +48,30 @@ export interface VocabWord {
   notes?: string;
   // Reading Discovery & Homework integration
   sourceType?: 'standard' | 'reading' | 'homework' | 'custom';
+  context?: string;
   bookTitle?: string;
   bookAuthor?: string;
   bookPage?: number;
   contextSentence?: string;
   dateDiscovered?: string;
+  dateAdded?: string;
   isHomework?: boolean;
   homeworkTag?: string;
+  // Bible / Religious Meaning & Scripture Reference
+  isBibleWord?: boolean;
+  bibleContext?: string;
+  scriptureReference?: string;
+  scriptureVerse?: string;
+  // Definition Status & Retry
+  definitionUnavailable?: boolean;
+  // Duplicate Tracking
+  timesSeen?: number;
+  readingOccurrences?: number;
+  lastSeen?: string;
+  // Learning Ecosystem Availability Flags
+  flashcardAvailable?: boolean;
+  spellingPracticeAvailable?: boolean;
+  pronunciationAvailable?: boolean;
   // Enhanced Daily Learning, Flashcard & Spelling Tracking
   syllables?: string;
   memoryTip?: string;
@@ -523,6 +543,7 @@ export interface KnowledgeGardenWordPlant {
 export interface UserLearningHomeState {
   activeRoomId: HomeRoomId;
   rooms: Record<HomeRoomId, HomeRoom>;
+  inventory: Record<string, number>; // itemId -> available quantity in inventory (>= 0)
   unlockedItemIds: string[];
   collectedStickerIds: string[];
   lastEarnedGift?: {

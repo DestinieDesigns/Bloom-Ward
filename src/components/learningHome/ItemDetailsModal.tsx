@@ -8,6 +8,7 @@ interface ItemDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   isUnlocked: boolean;
+  inventoryCount?: number;
   userCoins: number;
   onBuyItem: (item: HomeItem) => void;
   onPlaceItem?: (item: HomeItem) => void;
@@ -45,6 +46,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({
   isOpen,
   onClose,
   isUnlocked,
+  inventoryCount = 0,
   userCoins,
   onBuyItem,
   onPlaceItem
@@ -54,6 +56,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({
   const price = item.price ?? 0;
   const canAfford = userCoins >= price;
   const isReward = item.shopCategory === 'rewards' || price === 0;
+  const hasInInventory = inventoryCount > 0 || isUnlocked;
 
   return (
     <div
@@ -98,14 +101,15 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({
             </div>
 
             {/* In Inventory Tag */}
-            {isUnlocked && (
+            {hasInInventory && (
               <span className="absolute top-3 left-3 bg-emerald-100/90 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1 shadow-xs">
-                <Check className="w-3.5 h-3.5" /> In Inventory
+                <Check className="w-3.5 h-3.5" />
+                <span>In Backpack {inventoryCount > 0 ? `(×${inventoryCount})` : ''}</span>
               </span>
             )}
 
             {/* Price Badge */}
-            {!isUnlocked && !isReward && (
+            {!isReward && price > 0 && (
               <span className="absolute top-3 right-3 bg-amber-500 text-white font-bold text-xs px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5">
                 <Coins className="w-3.5 h-3.5" />
                 <span>{price} Coins</span>
@@ -113,7 +117,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({
             )}
 
             {/* Milestone Badge */}
-            {isReward && !isUnlocked && (
+            {isReward && !hasInInventory && (
               <span className="absolute top-3 right-3 bg-purple-600 text-white font-bold text-xs px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Learning Reward</span>
@@ -187,18 +191,35 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({
           </div>
 
           {/* Action button states */}
-          {isUnlocked ? (
-            <button
-              id="place-item-btn"
-              onClick={() => {
-                if (onPlaceItem) onPlaceItem(item);
-                onClose();
-              }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md transition-transform active:scale-95 cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              <span>Place in Room</span>
-            </button>
+          {inventoryCount > 0 ? (
+            <div className="flex items-center gap-2">
+              <button
+                id="place-item-btn"
+                onClick={() => {
+                  if (onPlaceItem) onPlaceItem(item);
+                  onClose();
+                }}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md transition-transform active:scale-95 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Place in Room (×{inventoryCount})</span>
+              </button>
+
+              {!isReward && price > 0 && canAfford && (
+                <button
+                  id="buy-another-item-btn"
+                  onClick={() => {
+                    onBuyItem(item);
+                    onClose();
+                  }}
+                  className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold text-xs px-3.5 py-2.5 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+                  title="Buy another copy"
+                >
+                  <Coins className="w-3.5 h-3.5 text-amber-600" />
+                  <span>+1 More ({price} 🪙)</span>
+                </button>
+              )}
+            </div>
           ) : isReward ? (
             <div className="flex items-center gap-2 text-xs font-bold text-purple-800 bg-purple-100 px-4 py-2.5 rounded-xl border border-purple-200">
               <Lock className="w-4 h-4 text-purple-600" />

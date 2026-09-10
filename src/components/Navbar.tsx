@@ -21,6 +21,7 @@ import { sound } from '../utils/audio';
 import { getThemeConfig } from '../data/themes';
 import { SyncIndicator } from './SyncIndicator';
 import { SyncStatus } from '../services/syncService';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   currentSection?: AppSection;
@@ -250,6 +251,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </button>
             )}
+
+            {/* PWA In-App Install Prompt */}
+            <PWAInstallButton compact />
 
             {/* Cloud Auto-Save */}
             <SyncIndicator

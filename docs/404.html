@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>BloomWord</title>
+    <script>
+      // Single Page Application redirect for GitHub Pages
+      // Detects the repository path segment dynamically if hosted on github.io
+      var path = window.location.pathname;
+      var segments = path.split('/').filter(Boolean);
+      var base = '/';
+      if (window.location.hostname.endsWith('github.io') && segments.length > 0) {
+        // First segment on github.io is the repository name
+        base = '/' + segments[0] + '/';
+      }
+      window.location.replace(base + window.location.search + window.location.hash);
+    </script>
+  </head>
+  <body style="font-family: 'Quicksand', sans-serif, system-ui; text-align: center; padding: 48px; background-color: #FFF5F8; color: #db2777;">
+    <h2>🌸 BloomWord</h2>
+    <p>Loading application... If you are not redirected automatically, <a href="./" style="color: #be185d; font-weight: bold;">click here</a>.</p>
+  </body>
+</html>

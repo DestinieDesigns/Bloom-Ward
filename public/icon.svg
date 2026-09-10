@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4338CA"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#86EFAC"/>
+      <stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="256" cy="230" r="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FEF08A" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Background with rounded squircle corners -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <!-- Ambient Soft Glow -->
+  <circle cx="256" cy="230" r="160" fill="url(#glowGrad)"/>
+  <!-- Open Book Base -->
+  <path d="M120 330 C180 320, 240 335, 256 350 C272 335, 332 320, 392 330 L392 375 C332 365, 272 380, 256 395 C240 380, 180 365, 120 375 Z" fill="#E2E8F0"/>
+  <path d="M130 315 C185 305, 240 320, 256 335 C272 320, 327 305, 382 315 L382 355 C327 345, 272 360, 256 375 C240 360, 185 345, 130 355 Z" fill="#FFFFFF"/>
+  <!-- Stem -->
+  <path d="M256 340 C256 260, 256 210, 256 185" stroke="#22C55E" stroke-width="14" stroke-linecap="round"/>
+  <!-- Left Sprout Leaf -->
+  <path d="M256 255 C220 250, 185 220, 195 185 C225 180, 250 215, 256 255 Z" fill="url(#leafGrad)"/>
+  <!-- Right Sprout Leaf -->
+  <path d="M256 230 C290 225, 325 195, 315 160 C285 155, 260 190, 256 230 Z" fill="url(#leafGrad)"/>
+  <!-- Golden Sparkle/Star of Wisdom -->
+  <path d="M256 125 L263 148 L286 155 L263 162 L256 185 L249 162 L226 155 L249 148 Z" fill="#FACC15"/>
+</svg>

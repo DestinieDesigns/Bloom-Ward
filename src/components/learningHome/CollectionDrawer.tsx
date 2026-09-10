@@ -19,6 +19,7 @@ interface CollectionDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   unlockedItemIds: string[];
+  inventory: Record<string, number>;
   placedItems: PlacedHomeItem[];
   onPlaceItem: (item: HomeItem) => void;
   onOpenShop?: () => void;
@@ -37,6 +38,7 @@ export const CollectionDrawer: React.FC<CollectionDrawerProps> = ({
   isOpen,
   onClose,
   unlockedItemIds,
+  inventory,
   placedItems,
   onPlaceItem,
   onOpenShop
@@ -181,9 +183,16 @@ export const CollectionDrawer: React.FC<CollectionDrawerProps> = ({
                     </h4>
 
                     {isUnlocked ? (
-                      <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
-                        {item.description}
-                      </p>
+                      <div>
+                        <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
+                          {item.description}
+                        </p>
+                        <div className="mt-1">
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-pink-100 text-pink-900 border border-pink-200">
+                            × {inventory[item.id] || 0} in backpack
+                          </span>
+                        </div>
+                      </div>
                     ) : (
                       <div className="mt-1 p-1.5 rounded-lg bg-amber-50 border border-amber-200/60 text-[10px] text-amber-900 font-medium">
                         <span className="font-bold block text-[9px] uppercase tracking-wider text-amber-800">
@@ -197,16 +206,32 @@ export const CollectionDrawer: React.FC<CollectionDrawerProps> = ({
                   {/* Place Item Button */}
                   <div className="mt-3 pt-2 border-t border-slate-100">
                     {isUnlocked ? (
-                      <button
-                        onClick={() => {
-                          sound.playPop();
-                          onPlaceItem(item);
-                        }}
-                        className="w-full py-1.5 rounded-xl bg-pink-500 hover:bg-pink-600 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Place in Room</span>
-                      </button>
+                      (inventory[item.id] || 0) > 0 ? (
+                        <button
+                          onClick={() => {
+                            sound.playPop();
+                            onPlaceItem(item);
+                          }}
+                          className="w-full py-1.5 rounded-xl bg-pink-500 hover:bg-pink-600 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Place in Room</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            sound.playPop();
+                            if (onOpenShop) {
+                              onClose();
+                              onOpenShop();
+                            }
+                          }}
+                          className="w-full py-1.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <ShoppingBag className="w-3 h-3" />
+                          <span>Shop More</span>
+                        </button>
+                      )
                     ) : (
                       <div className="text-[10px] text-center font-bold text-slate-400 py-1 flex items-center justify-center gap-1">
                         <Lock className="w-3 h-3" />

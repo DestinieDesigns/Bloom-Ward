@@ -21,6 +21,7 @@ interface DecorateDrawerProps {
   activeTab: DecorateMainTab;
   onClose: () => void;
   unlockedItemIds: string[];
+  inventory: Record<string, number>;
   currentRoom: HomeRoom;
   onPlaceItem: (item: HomeItem) => void;
   onUpdateRoomStyle: (updates: { wallpaperClass?: string; flooringClass?: string; styleTheme?: HomeRoom['styleTheme'] }) => void;
@@ -89,6 +90,7 @@ export const DecorateDrawer: React.FC<DecorateDrawerProps> = ({
   activeTab,
   onClose,
   unlockedItemIds,
+  inventory,
   currentRoom,
   onPlaceItem,
   onUpdateRoomStyle,
@@ -319,7 +321,9 @@ export const DecorateDrawer: React.FC<DecorateDrawerProps> = ({
             ) : (
               <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
                 {displayedItems.map((item) => {
-                  const isUnlocked = unlockedSet.has(item.id) || item.unlocked;
+                  const count = inventory[item.id] || 0;
+                  const isUnlockedOrStarter = unlockedSet.has(item.id) || item.unlocked;
+
                   return (
                     <div
                       key={item.id}
@@ -331,7 +335,21 @@ export const DecorateDrawer: React.FC<DecorateDrawerProps> = ({
                       <span className="text-xs font-bold text-stone-800 truncate w-full mt-1">
                         {item.name}
                       </span>
-                      {isUnlocked ? (
+
+                      {/* Real Inventory Quantity Badge */}
+                      <div className="mt-1 flex items-center justify-center">
+                        {count > 0 ? (
+                          <span className="text-[11px] font-black text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                            × {count} in backpack
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-stone-400 bg-stone-200/60 px-2 py-0.5 rounded-full">
+                            × 0 available
+                          </span>
+                        )}
+                      </div>
+
+                      {count > 0 ? (
                         <button
                           onClick={() => {
                             sound.playSuccessChime();
@@ -350,9 +368,11 @@ export const DecorateDrawer: React.FC<DecorateDrawerProps> = ({
                             onOpenShop();
                             onClose();
                           }}
-                          className="mt-2 w-full py-1.5 rounded-xl bg-stone-200 hover:bg-amber-100 text-stone-600 hover:text-amber-900 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                          className="mt-2 w-full py-1.5 rounded-xl bg-stone-200 hover:bg-amber-100 text-stone-700 hover:text-amber-900 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                          title="Visit Shop to get more copies"
                         >
-                          <span>🔒 Shop</span>
+                          <ShoppingBag className="w-3 h-3" />
+                          <span>Shop More</span>
                         </button>
                       )}
                     </div>
